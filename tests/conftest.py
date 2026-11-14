@@ -72,3 +72,26 @@ def state(tmp_path):
 @pytest.fixture
 def interests():
     return Interests(follow=["Kubernetes security"], mute=["sponsored"], mute_feeds=["Vendor Blog"])
+
+
+class FakeDav:
+    """In-memory WebDAV: `files` maps vault-relative paths to text."""
+
+    def __init__(self):
+        self.files = {}
+
+    def read(self, path):
+        return self.files.get(path)
+
+    def write(self, path, text):
+        self.files[path] = text
+
+    def list(self, directory):
+        pre = directory.strip("/") + "/"
+        return sorted(p[len(pre):] for p in self.files
+                      if p.startswith(pre) and "/" not in p[len(pre):] and p.endswith(".md"))
+
+
+@pytest.fixture
+def dav():
+    return FakeDav()
