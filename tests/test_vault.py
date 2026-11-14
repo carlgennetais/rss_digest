@@ -150,3 +150,10 @@ def test_empty_url_or_title_is_not_a_dedup_key(dav, state):
     assert state.is_processed(no_url[0].id) and state.is_processed(no_title[0].id)
     assert not state.has_key("u:https:///") and not state.has_key("t:")
     assert select_new_kept([no_url[1], no_title[1]], state) == [no_url[1], no_title[1]]
+
+
+def test_spelling_variant_of_own_page_is_updated_not_flagged(dav, state):
+    run([item("a")], dav, state, FakeLLM(json_replies=[{"1": ["NEW: CI/CD"]}, W]))
+    llm = FakeLLM(json_replies=[{"1": ["NEW: CI-CD"]}, {"summary": "new", "recent": "- r"}])
+    assert run([item("b")], dav, state, llm) == []
+    assert parse_page(dav.files["Topics/CI-CD.md"]).summary == "new" and state.is_processed(item("b").id)

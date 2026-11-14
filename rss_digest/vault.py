@@ -122,7 +122,7 @@ def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) 
     page.front["updated"] = datetime.now(timezone.utc).date().isoformat()
     out = render_page(page)
     dav.write(path, out)
-    state.set_page_hash(title, ai_hash(out))
+    state.set_page_hash(safe_filename(title), ai_hash(out))
 
 
 def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt, batch_size=20) -> list[str]:
@@ -148,7 +148,7 @@ def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt,
             text = dav.read(path)
             if text is not None:
                 try:
-                    bad = not is_topic_page(text) or ai_hash(text) != state.page_hash(title)
+                    bad = not is_topic_page(text) or ai_hash(text) != state.page_hash(stem)
                     if not bad:
                         parse_page(text)
                 except PageParseError:
