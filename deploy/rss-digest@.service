@@ -1,0 +1,7 @@
+[Unit]
+Description=rss-digest daily run (%i)
+
+[Service]
+Type=oneshot
+User=rss-digest
+ExecStart=/opt/rss-digest/.venv/bin/rss-digest --config /etc/rss-digest/%i.toml run

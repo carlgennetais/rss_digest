@@ -1,0 +1,9 @@
+[Unit]
+Description=rss-digest daily timer (%i)
+
+[Timer]
+OnCalendar=*-*-* 06:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
