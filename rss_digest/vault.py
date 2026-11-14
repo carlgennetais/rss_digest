@@ -13,6 +13,8 @@ ASSIGN_PROMPT = (
     "Assign each numbered article to at most 2 topics. Reply with JSON mapping the article number to a list "
     'of topic titles: an existing title verbatim, or "NEW: Title" for a new topic. Omit articles that fit no topic.'
 )
+WRITER_FORMAT = ('\n\nReply with JSON only: {"description": "<one line>", "summary": "<markdown, no ## headings>", '
+                 '"recent": "<markdown bullets>"}')
 
 
 @dataclass
@@ -97,7 +99,7 @@ def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) 
     user = (f"Topic: {title}\n\n## Current summary\n{page.summary}\n\n## Current recent changes\n{page.recent}\n\n"
             f"## My notes (read-only context, never rewrite)\n{page.my_notes_tail}\n\n## New articles\n"
             + "\n\n".join(f"Title: {i.title}\nURL: {i.url}\n{strip_md_images(i.text)[:3000]}" for i in items))
-    reply = llm.chat_json(writer_model, page_prompt, user)
+    reply = llm.chat_json(writer_model, page_prompt + WRITER_FORMAT, user)
     if not (isinstance(reply, dict) and isinstance(reply.get("summary"), str)
             and isinstance(reply.get("recent"), str)):
         raise LLMError("writer reply needs string summary and recent")

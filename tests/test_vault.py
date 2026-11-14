@@ -116,3 +116,16 @@ def test_sibling_page_not_rewritten_with_known_items(dav, state, edited):
     llm = FakeLLM(json_replies=[{"1": ["K8s", "B"]}])
     assert run([a], dav, state, llm) == ["K8s"]
     assert len(llm.calls) == 1 and dav.files["Topics/B.md"] == b_text and not state.is_processed(a.id)
+
+
+def test_writer_prompt_carries_json_contract(dav, state):
+    llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, W])
+    update_vault([item("a")], dav, state, llm, "c", "w", "user prompt")
+    system = llm.calls[1][2]
+    assert system.startswith("user prompt") and all(f'"{k}"' in system for k in ("description", "summary", "recent"))
+
+
+def test_contract_reply_parses():
+    from rss_digest.llm import _parse_json
+    reply = 'Here:\n{"description": "d", "summary": "See [x](https://e.com) now", "recent": "- 2026-11-14: [a](u)"}'
+    assert _parse_json(reply)["recent"] == "- 2026-11-14: [a](u)"
