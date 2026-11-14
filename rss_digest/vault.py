@@ -87,9 +87,13 @@ def _assign(batch, topics, llm, cheap_model) -> dict[str, list]:
     return wanted
 
 
-def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) -> bool:
+def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) -> None:
     path = f"{TOPICS_DIR}/{safe_filename(title)}.md"
     page = new_page(title) if text is None else parse_page(text)
+    cited = {normalize_url(s["url"]) for s in page.front["sources"] if s.get("url")}
+    items = [i for i in items if normalize_url(i.url) not in cited]
+    if not items:  # already on the page: no writer call, no rewrite
+        return
     user = (f"Topic: {title}\n\n## Current summary\n{page.summary}\n\n## Current recent changes\n{page.recent}\n\n"
             f"## My notes (read-only context, never rewrite)\n{page.my_notes_tail}\n\n## New articles\n"
             + "\n\n".join(f"Title: {i.title}\nURL: {i.url}\n{strip_md_images(i.text)[:3000]}" for i in items))
@@ -111,7 +115,6 @@ def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) 
     out = render_page(page)
     dav.write(path, out)
     state.set_page_hash(title, ai_hash(out))
-    return True
 
 
 def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt, batch_size=20) -> list[str]:

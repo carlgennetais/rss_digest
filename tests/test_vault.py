@@ -107,3 +107,12 @@ def test_list_topics_and_profile(dav):
     topics = list_topics(dav)
     assert topics == [TopicRef("One.md", "Uno", "first")]
     assert profile_text(topics) == "Uno: first"
+
+
+def test_sibling_page_not_rewritten_with_known_items(dav, state, edited):
+    a = item("a")
+    run([a], dav, state, FakeLLM(json_replies=[{"1": ["K8s", "NEW: B"]}, W]))
+    b_text = dav.files["Topics/B.md"]
+    llm = FakeLLM(json_replies=[{"1": ["K8s", "B"]}])
+    assert run([a], dav, state, llm) == ["K8s"]
+    assert len(llm.calls) == 1 and dav.files["Topics/B.md"] == b_text and not state.is_processed(a.id)
