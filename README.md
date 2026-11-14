@@ -17,7 +17,8 @@ The config file holds passwords and API keys: `chown rss-digest` it and `chmod 6
 ```
 sudo useradd --system --home /var/lib/rss-digest --create-home rss-digest
 sudo git clone <repo-url> /opt/rss-digest
-cd /opt/rss-digest && sudo python3 -m venv .venv && sudo .venv/bin/pip install .
+curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh   # if uv is not installed
+cd /opt/rss-digest && sudo uv sync --locked --no-dev
 sudo mkdir -p /etc/rss-digest
 sudo cp config.example.toml /etc/rss-digest/carl_pro.toml   # edit it, then chown/chmod as above
 sudo cp deploy/rss-digest@.service deploy/rss-digest@.timer /etc/systemd/system/
@@ -65,3 +66,10 @@ always preserved.
 - Android sync: Remotely Save (WebDAV to Nextcloud) or FolderSync.
 - Q&A over the vault: Copilot for Obsidian with a custom OpenAI-compatible endpoint (the same one as
   `[llm]`). This is a recommendation only. Verify it works on Android before relying on it.
+
+## Development
+
+```
+uv sync
+uv run pytest
+```

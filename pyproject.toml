@@ -9,7 +9,7 @@ description = "Daily FreshRSS digest and LLM-maintained topic pages in an Obsidi
 requires-python = ">=3.11"
 dependencies = ["httpx", "PyYAML"]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = ["pytest"]
 
 [project.scripts]
