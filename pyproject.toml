@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rss-digest"
+version = "0.1.0"
+description = "Daily FreshRSS digest and LLM-maintained topic pages in an Obsidian vault"
+requires-python = ">=3.11"
+dependencies = ["httpx", "PyYAML"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+rss-digest = "rss_digest.cli:main"
+
+[tool.setuptools]
+packages = ["rss_digest"]
+
+[tool.setuptools.package-data]
+rss_digest = ["defaults/*.md"]
