@@ -1,6 +1,7 @@
 import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from dataclasses import replace
 from types import SimpleNamespace
 
 import httpx
@@ -111,3 +112,25 @@ def test_backlog_budget_returns_normally(env, monkeypatch, caplog):
 
 def test_main_returns_1_on_bad_config(tmp_path):
     assert main(["--config", str(tmp_path / "missing.toml"), "run"]) == 1
+
+
+def wb_item(title):
+    return replace(item(title, id=f"wallabag:{title}"), source="wallabag")
+
+
+def test_unwritten_wallabag_item_keeps_since_window(env):
+    before = (NOW - timedelta(days=3)).isoformat()
+    env.state.set("last_kept_run", before)
+    env.wb._entries = [wb_item("w")]
+    env.llm = FakeLLM(json_errors=2)
+    daily(env)
+    assert env.state.get("last_kept_run") == before and not env.state.is_processed("wallabag:w")
+    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"summary": "s", "recent": "r"}])
+    run_daily(CONF, env.fresh, env.wb, env.dav, env.llm, env.state, now=NOW + timedelta(days=1))
+    assert env.wb.since == NOW - timedelta(days=3) and env.state.is_processed("wallabag:w")
+    assert env.state.get("last_kept_run") == (NOW + timedelta(days=1)).isoformat()
+
+
+def test_assign_prompt_requires_a_topic_for_every_article():
+    from rss_digest.vault import ASSIGN_PROMPT
+    assert "Omit" not in ASSIGN_PROMPT and "at least one" in ASSIGN_PROMPT

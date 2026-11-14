@@ -48,6 +48,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
 
     flagged: list[str] = []
     notice, vault_error = None, None
+    kept = []
     try:
         kept = select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state)
         if kept:
@@ -57,7 +58,8 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
     except Exception as e:
         log.exception("vault update failed")
         notice, vault_error = "Vault update failed (see logs); will retry next run.", e
-    if vault_error is None:
+    # Wallabag is fetched since last_kept_run, so only advance it once every Wallabag item is on its pages.
+    if vault_error is None and all(state.is_processed(i.id) for i in kept if i.source == "wallabag"):
         state.set("last_kept_run", now.isoformat())
 
     items = fresh.reading_list(since=since("last_digest_run"))

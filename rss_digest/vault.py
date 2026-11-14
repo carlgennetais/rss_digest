@@ -10,8 +10,8 @@ log = logging.getLogger(__name__)
 TOPICS_DIR = "Topics"
 
 ASSIGN_PROMPT = (
-    "Assign each numbered article to at most 2 topics. Reply with JSON mapping the article number to a list "
-    'of topic titles: an existing title verbatim, or "NEW: Title" for a new topic. Omit articles that fit no topic.'
+    "Assign each numbered article to at least one and at most 2 topics. Reply with JSON mapping every article "
+    'number to a list of topic titles: an existing title verbatim, or "NEW: Title" for a new topic.'
 )
 WRITER_FORMAT = ('\n\nReply with JSON only: {"description": "<one line>", "summary": "<markdown, no ## headings>", '
                  '"recent": "<markdown bullets>"}')
