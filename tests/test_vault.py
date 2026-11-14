@@ -157,3 +157,29 @@ def test_spelling_variant_of_own_page_is_updated_not_flagged(dav, state):
     llm = FakeLLM(json_replies=[{"1": ["NEW: CI-CD"]}, {"summary": "new", "recent": "- r"}])
     assert run([item("b")], dav, state, llm) == []
     assert parse_page(dav.files["Topics/CI-CD.md"]).summary == "new" and state.is_processed(item("b").id)
+
+
+@pytest.mark.parametrize("op", ["read", "write"])
+def test_dav_error_on_one_page_skips_only_that_page(state, op):
+    import httpx
+    from conftest import FakeDav
+
+    class Locked(FakeDav):
+        def _check(self, path):
+            if path == "Topics/A.md":
+                req = httpx.Request("PUT", "http://dav/" + path)
+                raise httpx.HTTPStatusError("423", request=req, response=httpx.Response(423, request=req))
+
+        def read(self, path):
+            if op == "read":
+                self._check(path)
+            return super().read(path)
+
+        def write(self, path, text):
+            self._check(path)
+            super().write(path, text)
+    dav = Locked()
+    llm = FakeLLM(json_replies=[{"1": ["NEW: A"], "2": ["NEW: B"]}, W, W])
+    assert run([item("x"), item("y")], dav, state, llm) == []
+    assert list(dav.files) == ["Topics/B.md"]
+    assert not state.is_processed(item("x").id) and state.is_processed(item("y").id)

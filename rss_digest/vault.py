@@ -2,6 +2,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import httpx
+
 from rss_digest.llm import LLMError
 from rss_digest.pages import PageParseError, ai_hash, is_topic_page, new_page, parse_page, render_page
 from rss_digest.textutil import normalize_url, safe_filename, strip_md_images, title_key
@@ -145,7 +147,11 @@ def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt,
         done: set[str] = set()
         for stem, (title, page_items) in pages.items():
             path = f"{TOPICS_DIR}/{stem}.md"
-            text = dav.read(path)
+            try:
+                text = dav.read(path)
+            except httpx.HTTPStatusError as e:
+                log.warning("reading page %s failed, skipping: %s", path, e)
+                continue
             if text is not None:
                 try:
                     bad = not is_topic_page(text) or ai_hash(text) != state.page_hash(stem)
@@ -160,7 +166,7 @@ def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt,
                     continue
             try:
                 _write_page(title, text, page_items, dav, state, llm, writer_model, page_prompt)
-            except LLMError as e:
+            except (LLMError, httpx.HTTPStatusError) as e:
                 log.warning("writing page %s failed, skipping: %s", title, e)
                 continue
             done.add(stem)
