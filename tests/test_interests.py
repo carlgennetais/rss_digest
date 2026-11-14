@@ -43,3 +43,9 @@ def test_linkless_items_are_not_deduped(state, interests):
     state.add_key("u:https:///")
     a, b = replace(item("a"), url=""), replace(item("b"), url="")
     assert filter_items([a, b], interests, state) == ([a, b], 0)
+
+
+def test_seeded_interests_file_has_no_active_rules():
+    from rss_digest.cli import _default
+    i = parse_interests(_default("interests.md"))
+    assert i.follow == [] and i.mute == [] and i.mute_feeds == []

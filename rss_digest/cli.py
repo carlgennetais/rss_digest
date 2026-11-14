@@ -50,7 +50,8 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
     flagged: list[str] = []
     notice, vault_error = None, None
     kept = []
-    limit, llm.limit = llm.limit, max(0, llm.limit - DIGEST_RESERVE)
+    # the vault step keeps at least half the budget, even when it is below the reserve
+    limit, llm.limit = llm.limit, llm.limit - min(DIGEST_RESERVE, llm.limit // 2)
     try:
         kept = select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state)
         if kept:
@@ -99,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr,
                         format="%(asctime)s %(levelname)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # one INFO line per request floods the journal
     try:
         conf = load_config(args.config)
         clients = (FreshRSS(conf.freshrss), Wallabag(conf.wallabag), WebDAV(conf.nextcloud),

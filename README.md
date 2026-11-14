@@ -46,7 +46,7 @@ To file everything already starred or saved, run once by hand. It stops cleanly 
 token budget (`max_tokens_per_run`) is reached; repeat until it no longer says "re-run to continue".
 
 ```
-sudo -u rss-digest /opt/rss-digest/.venv/bin/rss-digest --config /etc/rss-digest/carl_pro.toml backlog
+sudo -u rss-digest flock /var/lib/rss-digest/carl_pro.lock /opt/rss-digest/.venv/bin/rss-digest --config /etc/rss-digest/carl_pro.toml backlog
 ```
 
 ## Vault

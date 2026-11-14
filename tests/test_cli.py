@@ -137,12 +137,30 @@ def test_assign_prompt_requires_a_topic_for_every_article():
 
 
 def test_vault_step_leaves_reserve_for_digest(env):
+    class SpyLLM(FakeLLM):
+        def _record(self, *a):
+            self.limits.append(self.limit)
+            super()._record(*a)
     env.fresh._starred = [item("Starred one")]
     env.fresh.reading = [item("news")]
-    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"1": 5}], text_replies=["summary body"],
-                      tokens_per_call=20_000)
-    env.llm.limit = 50_000
+    env.llm = SpyLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}, {"1": 5}],
+                     text_replies=["summary body"])
+    env.llm.limits = []
     daily(env)
-    md = env.dav.files[f"Digest/{NOW.date()}.md"]
-    assert "Vault update paused: token budget reached." in md and "summary body" in md
-    assert [c[0] for c in env.llm.calls] == ["chat_json", "chat_json", "chat"] and env.llm.limit == 50_000
+    assert env.llm.limits == [170_000, 170_000, 200_000, 200_000] and env.llm.limit == 200_000
+
+
+def test_small_budget_still_gives_vault_a_share(env):
+    env.fresh._starred = [item("Starred one")]
+    env.fresh.reading = [item("news")]
+    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}, {"1": 5}],
+                      text_replies=["summary body"], tokens_per_call=5_000)
+    env.llm.limit = 20_000
+    daily(env)
+    assert env.state.is_processed(item("Starred one").id) and "summary body" in env.dav.files[f"Digest/{NOW.date()}.md"]
+
+
+def test_main_quiets_httpx_request_logs(tmp_path):
+    import logging
+    main(["--config", str(tmp_path / "missing.toml"), "run"])
+    assert logging.getLogger("httpx").level == logging.WARNING
