@@ -5,7 +5,14 @@ import pytest
 
 from conftest import Recorder
 from rss_digest.config import LLMConf
-from rss_digest.llm import LLM, BudgetExceeded, LLMError
+from rss_digest.llm import LLM, BudgetExceeded, LLMAuthError, LLMError
+
+
+@pytest.fixture(autouse=True)
+def sleeps(monkeypatch):
+    calls = []
+    monkeypatch.setattr("rss_digest.llm.time.sleep", calls.append)
+    return calls
 
 
 def conf(max_tokens=200000, base="http://x/v1/"):
@@ -81,7 +88,7 @@ def test_budget_blocks_next_call():
 
 
 def test_http_error_and_bad_shape_raise_llmerror():
-    llm, _ = make([httpx.Response(500, text="boom")])
+    llm, _ = make([httpx.Response(500, text="boom"), httpx.Response(500, text="boom")])
     with pytest.raises(LLMError):
         llm.chat("m", "s", "u")
     llm, _ = make([httpx.Response(200, json={"choices": []})])
@@ -105,3 +112,27 @@ def test_limit_attribute_caps_budget():
     llm.chat("m", "s", "u")
     with pytest.raises(BudgetExceeded):
         llm.chat("m", "s", "u")
+
+
+def test_retries_once_on_429_honouring_retry_after(sleeps):
+    llm, rec = make([httpx.Response(429, headers={"Retry-After": "7"}), "ok"])
+    assert llm.chat("m", "s", "u") == "ok" and len(rec.requests) == 2 and sleeps == [7]
+
+
+def test_retry_after_capped_and_second_5xx_raises(sleeps):
+    llm, rec = make([httpx.Response(503, headers={"Retry-After": "600"}), httpx.Response(502)])
+    with pytest.raises(LLMError):
+        llm.chat("m", "s", "u")
+    assert len(rec.requests) == 2 and sleeps == [30]
+    llm, _ = make([httpx.Response(500, headers={"Retry-After": "soon"}), "ok"])
+    llm.chat("m", "s", "u")
+    assert sleeps == [30, 5]
+
+
+def test_auth_errors_are_not_llmerror(sleeps):
+    for code in (401, 402, 403):
+        llm, rec = make([httpx.Response(code)])
+        with pytest.raises(LLMAuthError):
+            llm.chat("m", "s", "u")
+        assert len(rec.requests) == 1
+    assert not issubclass(LLMAuthError, LLMError) and sleeps == []

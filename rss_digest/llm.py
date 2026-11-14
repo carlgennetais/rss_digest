@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from typing import Any
 
 import httpx
@@ -9,6 +10,10 @@ from rss_digest.config import LLMConf
 
 class LLMError(Exception):
     pass
+
+
+class LLMAuthError(Exception):
+    """Not an LLMError: a bad key or empty account must stop the run, not skip a batch."""
 
 
 class BudgetExceeded(Exception):
@@ -27,19 +32,26 @@ class LLM:
         if self.tokens_used >= self.limit:
             raise BudgetExceeded(f"{self.tokens_used}/{self.limit} tokens used")
         try:
-            r = self.client.post(
-                f"{self.base}/chat/completions",
-                headers={"Authorization": f"Bearer {self.conf.api_key}"},
-                json={
-                    "model": model,
-                    "temperature": 0.2,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                },
-                timeout=120,
-            )
+            for attempt in range(2):
+                r = self.client.post(
+                    f"{self.base}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.conf.api_key}"},
+                    json={
+                        "model": model,
+                        "temperature": 0.2,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ],
+                    },
+                    timeout=120,
+                )
+                if attempt or not (r.status_code == 429 or r.status_code >= 500):
+                    break
+                wait = r.headers.get("Retry-After", "")
+                time.sleep(min(int(wait) if wait.isdigit() else 5, 30))
+            if r.status_code in (401, 402, 403):
+                raise LLMAuthError(f"LLM refused the API key: HTTP {r.status_code}")
             r.raise_for_status()
             data = r.json()
         except (httpx.HTTPError, ValueError) as e:

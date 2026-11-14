@@ -129,3 +129,13 @@ def test_contract_reply_parses():
     from rss_digest.llm import _parse_json
     reply = 'Here:\n{"description": "d", "summary": "See [x](https://e.com) now", "recent": "- 2026-11-14: [a](u)"}'
     assert _parse_json(reply)["recent"] == "- 2026-11-14: [a](u)"
+
+
+def test_auth_error_is_not_swallowed(dav, state):
+    from rss_digest.llm import LLMAuthError
+
+    class AuthFail(FakeLLM):
+        def chat_json(self, *a):
+            raise LLMAuthError("401")
+    with pytest.raises(LLMAuthError):
+        run([item("a")], dav, state, AuthFail())

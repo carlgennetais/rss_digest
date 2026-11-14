@@ -2,7 +2,7 @@ import logging
 from datetime import date
 
 from rss_digest.interests import rank
-from rss_digest.llm import BudgetExceeded, LLMError
+from rss_digest.llm import BudgetExceeded, LLMAuthError, LLMError
 from rss_digest.textutil import strip_md_images
 
 log = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ def build_digest(day: date, items, interests, profile, llm, cheap_model, writer_
     else:
         try:
             ranked = rank(items, interests, profile, llm, cheap_model)
-        except (LLMError, BudgetExceeded) as e:
+        except (LLMError, LLMAuthError, BudgetExceeded) as e:
             log.warning("ranking failed, keeping input order: %s", e)
             ranked = [(it, 0.0) for it in items]
         top = [it for it, _ in ranked[:top_n]]
@@ -30,9 +30,9 @@ def build_digest(day: date, items, interests, profile, llm, cheap_model, writer_
         )
         try:
             body = strip_md_images(llm.chat(writer_model, digest_prompt, user)).strip()
-        except (LLMError, BudgetExceeded) as e:
+        except (LLMError, LLMAuthError, BudgetExceeded) as e:
             log.warning("summary failed, using plain list: %s", e)
-            body = "\n".join(_line(it) for it in top)
+            body = "\n".join(_line(it) for it in top) + "\n\nSummaries unavailable today (LLM error, see logs)."
         parts.append(body)
         if rest:
             parts.append("## Also notable\n" + "\n".join(_line(it) for it in rest))

@@ -43,3 +43,20 @@ def test_ranking_budget_and_summary_llmerror(interests):
     assert "- [a](https://ex.com/a) — Ex Blog" in md
     md = build_digest(D, [item("a")], interests, "", FakeLLM(json_replies=[{"1": 1}]), "c", "w", "", 1, 0, [])
     assert "- [a](https://ex.com/a) — Ex Blog" in md
+
+
+def test_auth_error_degrades_with_notice(interests):
+    from rss_digest.llm import LLMAuthError
+
+    class AuthFail(FakeLLM):
+        def chat_json(self, *a):
+            raise LLMAuthError("401")
+        chat = chat_json
+    md = build_digest(D, [item("a")], interests, "", AuthFail(), "c", "w", "", 1, 0, [])
+    assert "- [a](https://ex.com/a) — Ex Blog" in md
+    assert "Summaries unavailable today (LLM error, see logs)." in md
+
+
+def test_summary_fallback_adds_notice(interests):
+    md = build_digest(D, [item("a")], interests, "", FakeLLM(json_replies=[{"1": 1}]), "c", "w", "", 1, 0, [])
+    assert "Summaries unavailable today (LLM error, see logs)." in md
