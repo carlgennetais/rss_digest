@@ -47,8 +47,8 @@ def filter_items(items, interests, state) -> tuple[list[Item], int]:
         if _muted(it, interests):
             muted += 1
             continue
-        u = normalize_url(it.url)
-        if u in seen or state.has_key("u:" + u):
+        u = normalize_url(it.url) if it.url.strip() else None  # link-less items can't be deduped
+        if u and (u in seen or state.has_key("u:" + u)):
             continue
         seen.add(u)
         kept.append(it)

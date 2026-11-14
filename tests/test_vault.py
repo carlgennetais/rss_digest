@@ -139,3 +139,14 @@ def test_auth_error_is_not_swallowed(dav, state):
             raise LLMAuthError("401")
     with pytest.raises(LLMAuthError):
         run([item("a")], dav, state, AuthFail())
+
+
+def test_empty_url_or_title_is_not_a_dedup_key(dav, state):
+    from dataclasses import replace
+    no_url = [replace(item(t), url="") for t in ("a", "b")]
+    no_title = [item("", url=f"https://ex.com/{t}", id=f"freshrss:{t}") for t in ("c", "d")]
+    assert select_new_kept(no_url + no_title, state) == no_url + no_title
+    run([no_url[0], no_title[0]], dav, state, FakeLLM(json_replies=[{"1": ["NEW: T"], "2": ["T"]}, W]))
+    assert state.is_processed(no_url[0].id) and state.is_processed(no_title[0].id)
+    assert not state.has_key("u:https:///") and not state.has_key("t:")
+    assert select_new_kept([no_url[1], no_title[1]], state) == [no_url[1], no_title[1]]

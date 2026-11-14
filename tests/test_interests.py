@@ -36,3 +36,10 @@ def test_rank_batches_of_40_and_llm_error_scores_zero(interests):
     items = [item(f"t{n}") for n in range(41)]
     ranked = rank(items, interests, "", llm, "cheap")
     assert len(llm.calls) == 2 and [i.title for i, s in ranked if s] == ["t40"]
+
+
+def test_linkless_items_are_not_deduped(state, interests):
+    from dataclasses import replace
+    state.add_key("u:https:///")
+    a, b = replace(item("a"), url=""), replace(item("b"), url="")
+    assert filter_items([a, b], interests, state) == ([a, b], 0)

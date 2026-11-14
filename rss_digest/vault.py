@@ -43,10 +43,16 @@ def profile_text(topics: list[TopicRef]) -> str:
     return "\n".join(f"{t.title}: {t.description}" for t in topics)
 
 
+def _keys(it) -> list[str]:
+    """Dedup keys; an empty URL or title says nothing about which article this is."""
+    t = title_key(it.title)
+    return (["u:" + normalize_url(it.url)] if it.url.strip() else []) + (["t:" + t] if t else [])
+
+
 def select_new_kept(items, state) -> list:
     seen, out = set(), []
     for it in items:
-        keys = ("u:" + normalize_url(it.url), "t:" + title_key(it.title))
+        keys = _keys(it)
         if state.is_processed(it.id) or any(state.has_key(k) or k in seen for k in keys):
             continue
         seen.update(keys)
@@ -161,6 +167,6 @@ def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt,
             for it in page_items:
                 if needs[it.id] <= done:
                     state.mark_processed(it.id)
-                    state.add_key("u:" + normalize_url(it.url))
-                    state.add_key("t:" + title_key(it.title))
+                    for k in _keys(it):
+                        state.add_key(k)
     return flagged
