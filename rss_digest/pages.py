@@ -66,16 +66,26 @@ def parse_page(text: str) -> Page:
         raise PageParseError("AI headings out of order")
     s, r, so = positions
     front["updated"] = _iso(front.get("updated"))
-    srcs = front.get("sources") or []
-    front["sources"] = [{**x, "date": _iso(x.get("date"))} if "date" in x else x for x in srcs]
+    srcs = front.get("sources")
+    if srcs is None:
+        srcs = []
+    if not isinstance(srcs, list) or not all(isinstance(x, dict) for x in srcs):
+        raise PageParseError("sources must be a list of mappings")
+    front["sources"] = [{**x, "date": _iso(x["date"])} if "date" in x else x for x in srcs]
     return Page(front, ai[s.end():r.start()].strip(), ai[r.end():so.start()].strip(), tail)
+
+
+def _defang(text: str) -> str:
+    """Demote reserved headings inside AI text so the page always re-parses."""
+    return re.sub(r"^(?=## (?:My notes|Summary|Recent changes|Sources)[ \t\r]*$)", "#", text.strip(), flags=re.MULTILINE)
 
 
 def _ai_part(page: Page) -> str:
     f = yaml.safe_dump(page.front, sort_keys=False, allow_unicode=True)
-    src = "\n".join(f"- [{s['title']}]({s['url']}) — {s['date']}" for s in page.front.get("sources", []))
-    return (f"---\n{f}---\n## Summary\n{page.summary.strip()}\n\n"
-            f"## Recent changes\n{page.recent.strip()}\n\n## Sources\n{src}\n\n")
+    src = "\n".join(f"- [{s.get('title') or ''}]({s.get('url') or ''}) — {s.get('date') or ''}"
+                    for s in page.front.get("sources", []))
+    return (f"---\n{f}---\n## Summary\n{_defang(page.summary)}\n\n"
+            f"## Recent changes\n{_defang(page.recent)}\n\n## Sources\n{src}\n\n")
 
 
 def render_page(page: Page) -> str:

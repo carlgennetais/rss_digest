@@ -58,3 +58,26 @@ def test_parse_errors(bad):
 def test_missing_sources_key_is_empty_list():
     p = parse_page("---\ntype: topic\n---\n## Summary\n## Recent changes\n## Sources\n## My notes\n")
     assert p.front["sources"] == []
+
+
+@pytest.mark.parametrize("srcs", ['"oops"', "[a, b]", "[null]", "{a: 1}", "5"])
+def test_malformed_sources_raise_parse_error(srcs):
+    with pytest.raises(PageParseError):
+        parse_page(f"---\ntype: topic\nsources: {srcs}\n---\n## Summary\n## Recent changes\n## Sources\n## My notes\n")
+
+
+def test_render_tolerates_incomplete_source_entries():
+    p = new_page("X"); p.front["sources"] = [{"url": "https://a"}, {"title": "T"}]
+    parse_page(render_page(p))
+
+
+def test_embedded_headings_in_ai_text_are_neutralised():
+    tail = "## My notes\nmine\n"
+    p = new_page("X"); p.my_notes_tail = tail
+    p.summary = "a\n## My notes\nb\n## Sources\nc"
+    p.recent = "## Summary\n## Recent changes  \n- x"
+    out = render_page(p)
+    q = parse_page(out)
+    assert q.my_notes_tail == tail and render_page(q) == out
+    assert ai_hash(out) == ai_hash(out + "more\n") and out.endswith(tail)
+    assert ai_hash(out.replace("- x", "- y")) != ai_hash(out)
