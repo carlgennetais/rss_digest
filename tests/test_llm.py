@@ -96,3 +96,12 @@ def test_transport_error_raises_llmerror():
     llm = LLM(conf(), client=Recorder(boom).client)
     with pytest.raises(LLMError):
         llm.chat("m", "s", "u")
+
+
+def test_limit_attribute_caps_budget():
+    llm, _ = make(["ok", "ok"])
+    assert llm.limit == 200000
+    llm.limit = 25
+    llm.chat("m", "s", "u")
+    with pytest.raises(BudgetExceeded):
+        llm.chat("m", "s", "u")

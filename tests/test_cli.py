@@ -134,3 +134,15 @@ def test_unwritten_wallabag_item_keeps_since_window(env):
 def test_assign_prompt_requires_a_topic_for_every_article():
     from rss_digest.vault import ASSIGN_PROMPT
     assert "Omit" not in ASSIGN_PROMPT and "at least one" in ASSIGN_PROMPT
+
+
+def test_vault_step_leaves_reserve_for_digest(env):
+    env.fresh._starred = [item("Starred one")]
+    env.fresh.reading = [item("news")]
+    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"1": 5}], text_replies=["summary body"],
+                      tokens_per_call=20_000)
+    env.llm.limit = 50_000
+    daily(env)
+    md = env.dav.files[f"Digest/{NOW.date()}.md"]
+    assert "Vault update paused: token budget reached." in md and "summary body" in md
+    assert [c[0] for c in env.llm.calls] == ["chat_json", "chat_json", "chat"] and env.llm.limit == 50_000

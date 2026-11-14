@@ -21,12 +21,11 @@ class LLM:
         self.base = conf.base_url.rstrip("/")
         self.client = client or httpx.Client(timeout=120)
         self.tokens_used = 0
+        self.limit = conf.max_tokens_per_run
 
     def chat(self, model: str, system: str, user: str) -> str:
-        if self.tokens_used >= self.conf.max_tokens_per_run:
-            raise BudgetExceeded(
-                f"{self.tokens_used}/{self.conf.max_tokens_per_run} tokens used"
-            )
+        if self.tokens_used >= self.limit:
+            raise BudgetExceeded(f"{self.tokens_used}/{self.limit} tokens used")
         try:
             r = self.client.post(
                 f"{self.base}/chat/completions",

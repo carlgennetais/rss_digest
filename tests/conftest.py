@@ -27,17 +27,22 @@ from rss_digest.state import State  # noqa: E402
 class FakeLLM:
     """Canned LLM: records calls as (method, model, system, user)."""
 
-    def __init__(self, json_replies=None, text_replies=None, json_errors=0, raise_after=None):
+    def __init__(self, json_replies=None, text_replies=None, json_errors=0, raise_after=None, tokens_per_call=0):
         self.json_replies = list(json_replies or [])
         self.text_replies = list(text_replies or [])
         self.json_errors = json_errors
         self.raise_after = raise_after
         self.calls = []
         self.tokens_used = 0
+        self.tokens_per_call = tokens_per_call
+        self.limit = 200000
 
     def _record(self, method, model, system, user):
         if self.raise_after is not None and len(self.calls) >= self.raise_after:
             raise BudgetExceeded("fake budget")
+        if self.tokens_used >= self.limit:
+            raise BudgetExceeded("fake limit")
+        self.tokens_used += self.tokens_per_call
         self.calls.append((method, model, system, user))
 
     def chat_json(self, model, system, user):
