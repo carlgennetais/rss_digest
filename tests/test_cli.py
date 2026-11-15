@@ -169,3 +169,12 @@ def test_main_quiets_httpx_request_logs(tmp_path):
 def test_daily_writes_public_feed(env):
     daily(env)
     assert "Digest " + NOW.date().isoformat() in env.dav.files["Feed/digest.xml"]
+
+
+def test_daily_reads_the_page_of_a_thin_kept_item(env, monkeypatch):
+    monkeypatch.setattr("rss_digest.fetch.page_text", lambda url, client=None: "Full page text. " * 100)
+    env.wb = FakeWallabag([item("thin")])
+    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}])
+    daily(env)
+    writer_prompt = env.llm.calls[1][3]
+    assert "Full page text." in writer_prompt

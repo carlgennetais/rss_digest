@@ -8,6 +8,7 @@ from pathlib import Path
 from .config import load_config
 from .digest import build_digest
 from .feed import update_feed
+from .fetch import enrich
 from .freshrss import FreshRSS
 from .interests import filter_items, parse_interests
 from .llm import LLM, BudgetExceeded
@@ -54,7 +55,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
     # the vault step keeps at least half the budget, even when it is below the reserve
     limit, llm.limit = llm.limit, llm.limit - min(DIGEST_RESERVE, llm.limit // 2)
     try:
-        kept = select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state)
+        kept = enrich(select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state))
         if kept:
             flagged = update_vault(kept, dav, state, llm, conf.llm.cheap_model, conf.llm.writer_model, page_prompt)
     except BudgetExceeded:
@@ -88,7 +89,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
 def run_backlog(conf, fresh, wb, dav, llm, state) -> None:
     seed_config(dav)
     page_prompt = _config_text(dav, "page-prompt.md")
-    items = select_new_kept(fresh.starred() + wb.entries(None), state)
+    items = enrich(select_new_kept(fresh.starred() + wb.entries(None), state))
     log.info("Backlog: %d new items to process", len(items))
     try:
         update_vault(items, dav, state, llm, conf.llm.cheap_model, conf.llm.writer_model, page_prompt)

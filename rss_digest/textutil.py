@@ -22,36 +22,63 @@ def title_key(title: str) -> str:
 
 class _TextExtractor(HTMLParser):
     SKIP = {"script", "style", "figure", "picture", "svg", "noscript", "iframe"}
+    CHROME = {"nav", "header", "footer", "aside", "form", "head", "title"}  # dropped in main_only mode
     BLOCK = {"p", "div", "br", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "blockquote", "pre"}
 
-    def __init__(self):
+    def __init__(self, main_only: bool = False):
         super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
+        self.skip = self.SKIP | (self.CHROME if main_only else set())
+        self.parts: list[str] = []  # everything not skipped
+        self.regions: dict[str, list[str]] = {"article": [], "main": []}  # first <article>, first <main>
+        self.open: dict[str, int] = {"article": 0, "main": 0}
+        self.closed: set[str] = set()
         self.skip_depth = 0
 
+    def _emit(self, text):
+        self.parts.append(text)
+        for r, depth in self.open.items():
+            if depth:
+                self.regions[r].append(text)
+
     def handle_starttag(self, tag, attrs):
-        if tag in self.SKIP:
+        if tag in self.skip:
             self.skip_depth += 1
+        elif tag in self.open and tag not in self.closed:
+            self.open[tag] += 1
         elif tag in self.BLOCK:
-            self.parts.append("\n")
+            self._emit("\n")
 
     def handle_endtag(self, tag):
-        if tag in self.SKIP:
+        if tag in self.skip:
             self.skip_depth = max(0, self.skip_depth - 1)
+        elif tag in self.open and self.open[tag]:
+            self.open[tag] -= 1
+            if not self.open[tag]:
+                self.closed.add(tag)
         elif tag in self.BLOCK:
-            self.parts.append("\n")
+            self._emit("\n")
 
     def handle_data(self, data):
         if not self.skip_depth:
-            self.parts.append(data)
+            self._emit(data)
 
 
-def html_to_text(html: str) -> str:
-    p = _TextExtractor()
+def _clean(parts: list[str]) -> str:
+    lines = (" ".join(line.split()) for line in "".join(parts).splitlines())
+    return "\n".join(line for line in lines if line)
+
+
+def html_to_text(html: str, main_only: bool = False) -> str:
+    """Plain text without images or scripts. main_only: only the first <article>, else <main>, else the
+    whole page, always without navigation, header, footer, sidebars and forms."""
+    p = _TextExtractor(main_only)
     p.feed(html or "")
     p.close()
-    lines = (" ".join(line.split()) for line in "".join(p.parts).splitlines())
-    return "\n".join(line for line in lines if line)
+    if main_only:
+        for region in ("article", "main"):
+            if text := _clean(p.regions[region]):
+                return text
+    return _clean(p.parts)
 
 
 _MD_IMAGES = re.compile(r"!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\]|<img\b[^>]*>", re.IGNORECASE)

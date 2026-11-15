@@ -100,3 +100,9 @@ class FakeDav:
 @pytest.fixture
 def dav():
     return FakeDav()
+
+
+@pytest.fixture(autouse=True)
+def no_page_fetch(monkeypatch):
+    """Tests never touch the network: thin items stay thin unless a test stubs page_text itself."""
+    monkeypatch.setattr("rss_digest.fetch.page_text", lambda url, client=None: None)

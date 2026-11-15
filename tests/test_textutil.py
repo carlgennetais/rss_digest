@@ -39,3 +39,16 @@ def test_safe_filename_keeps_unicode():
     assert safe_filename("Sécurité réseau") == "Sécurité réseau"
     assert safe_filename("CI/CD: pipelines?") == "CI-CD - pipelines"
     assert safe_filename("...") == "Untitled"
+
+
+def test_main_only_prefers_article_and_drops_chrome():
+    html = ("<html><head><title>Site title</title></head><body><nav>Menu</nav><header>Site</header>"
+            "<article><h1>T</h1><p>Body text</p><aside>Ad</aside></article><footer>Legal</footer></body></html>")
+    t = html_to_text(html, main_only=True)
+    assert "Body text" in t and not {"Menu", "Site", "Ad", "Legal", "title"} & set(t.split())
+    assert "Menu" in html_to_text(html)  # default mode unchanged
+
+
+def test_main_only_falls_back_to_main_then_body():
+    assert html_to_text("<body><nav>N</nav><main><p>In main</p></main><p>outside</p></body>", main_only=True) == "In main"
+    assert html_to_text("<body><nav>N</nav><p>Just body</p></body>", main_only=True) == "Just body"
