@@ -119,3 +119,19 @@ def test_export_refuses_once_topics_are_assigned(tmp_path):
     with pytest.raises(FileExistsError):
         export([item("b")], tmp_path)
     assert json.loads((tmp_path / "items/1.json").read_text())["title"] == "a"
+
+
+def test_yt_transcript_uses_subtitles_saved_before_an_error(monkeypatch):
+    import subprocess
+    from pathlib import Path
+
+    def fake_run(args, **kw):
+        out = args[args.index("-o") + 1]
+        Path(out + ".en-US.vtt").write_text("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello talk\n")
+        if kw.get("check"):  # behave like the real subprocess.run
+            raise subprocess.CalledProcessError(1, args)
+        return subprocess.CompletedProcess(args, 1)  # a later track hit HTTP 429
+
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/yt-dlp")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert yt_transcript("https://youtu.be/abc") == "Hello talk"

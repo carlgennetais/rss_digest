@@ -39,9 +39,11 @@ def yt_transcript(url: str) -> str | None:
         return None
     with tempfile.TemporaryDirectory() as tmp:
         try:
-            subprocess.run(["yt-dlp", "--skip-download", "--write-subs", "--write-auto-subs",
+            # no check=True: yt-dlp exits non-zero when one of several matching tracks fails (often HTTP 429),
+            # even though it already saved a usable one
+            subprocess.run(["yt-dlp", "--skip-download", "--write-subs", "--write-auto-subs", "--sleep-subtitles", "1",
                             "--sub-langs", "en.*,fr.*", "--sub-format", "vtt", "-o", f"{tmp}/t", url],
-                           capture_output=True, timeout=60, check=True)
+                           capture_output=True, timeout=120)
         except (subprocess.SubprocessError, OSError):
             return None
         vtts = sorted(Path(tmp).glob("*.vtt"))
