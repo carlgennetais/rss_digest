@@ -70,3 +70,22 @@ def test_page_text_handles_invalid_url():
 
 def test_is_video_on_malformed_url():
     assert is_video("http://[::1") is False
+
+
+def test_enrich_gets_transcripts_for_thin_videos_only():
+    thin_video, long_video = item("v", url="https://youtu.be/a"), item("w", url="https://youtu.be/b", text="d" * 2000)
+    seen = []
+
+    def transcript(url):
+        seen.append(url)
+        return "spoken words " * 100
+
+    out = enrich([thin_video, long_video], fetch=lambda u: None, transcript=transcript)
+    assert seen == ["https://youtu.be/a"] and out[0].text.startswith("spoken words") and out[1] == long_video
+
+
+def test_enrich_survives_a_transcript_that_raises():
+    def boom(url):
+        raise OSError("yt-dlp broke")
+
+    assert enrich([item("v", url="https://youtu.be/a")], fetch=lambda u: None, transcript=boom)[0].text == ""

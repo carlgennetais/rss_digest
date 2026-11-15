@@ -2,16 +2,17 @@ import json
 import shutil
 
 from conftest import item
-from rss_digest.backlog import export, vtt_to_text, yt_transcript
+from rss_digest.backlog import export
+from rss_digest.fetch import vtt_to_text, yt_transcript
 
 
 def test_export_writes_items_and_index(tmp_path):
-    n = export([item("A", text="x" * 5000), item("B", url="https://youtu.be/abc", text="")], tmp_path,
-               transcript=lambda url: "hello transcript")
-    assert n == 2
-    a, b = (json.loads((tmp_path / f"items/{i}.json").read_text()) for i in (1, 2))
-    assert len(a["text"]) == 3000 and not a["thin"] and not a["video"]
-    assert b["video"] and b["text"] == "hello transcript" and b["thin"]
+    n = export([item("A", text="x" * 5000), item("B", url="https://youtu.be/abc", text=""),
+                item("C", text="y" * 150_000)], tmp_path)
+    assert n == 3
+    a, b, c = (json.loads((tmp_path / f"items/{i}.json").read_text()) for i in (1, 2, 3))
+    assert len(a["text"]) == 5000 and not a["thin"] and not a["video"]  # full text, no 3,000 cut
+    assert b["video"] and b["thin"] and len(c["text"]) == 100_000  # safety limit per item
     assert a["id"] == item("A").id and a["published"].startswith("2026-11-14")
     lines = (tmp_path / "titles.tsv").read_text().splitlines()
     assert lines[0] == "n\tsource\tdate\tfeed\ttags\tthin\ttitle" and lines[2].startswith("2\tfreshrss\t2026-11-14")
@@ -37,7 +38,7 @@ def test_run_export_selects_new_kept_items_enriched(tmp_path, state):
     state.mark_processed(done.id)
     fresh = SimpleNamespace(starred=lambda: [done, item("star", text="x" * 2000)])
     wb = SimpleNamespace(entries=lambda since: [item("saved", text="y" * 2000)])
-    assert run_export(fresh, wb, state, tmp_path, transcripts=False) == 2
+    assert run_export(fresh, wb, state, tmp_path) == 2
     titles = [json.loads((tmp_path / f"items/{n}.json").read_text())["title"] for n in (1, 2)]
     assert sorted(titles) == ["saved", "star"]
 

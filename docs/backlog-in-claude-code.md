@@ -10,9 +10,10 @@ are left alone, and items are marked processed in the state database.
 
 ## Before you start
 
-- **Usage:** each topic page needs about 10–20k tokens: its articles' text in, about 700 tokens out.
-  The whole backlog (about 1,500 items, 80–150 topics) is about 1.5–2M Sonnet tokens of your plan.
-  Batches of about 20 topics keep each session to roughly 300k tokens.
+- **Usage:** agents read every article in full (up to 100,000 characters per item) and full video
+  transcripts. Measured on 1,914 kept items, that's about 3.5M tokens of article text, plus roughly
+  2–5M for about 450 transcripts: **about 6–9M Sonnet tokens of your plan in total**. A topic page
+  averages about 50k tokens in and 700 out, so batches of 5–10 topics keep each session manageable.
 - **What goes through your account:** your work articles' text and your interests go through your
   personal Claude account. Scripted bulk use isn't clearly "ordinary" plan use.
 - **`backlog/` holds article text.** It is git-ignored. Delete it when you're done.
@@ -21,21 +22,22 @@ are left alone, and items are marked processed in the state database.
 
 ```bash
 cp config.toml config.backlog.toml          # then set: state_path = "backlog/state.db"
-brew install yt-dlp                          # optional: YouTube transcripts
+brew install yt-dlp                          # YouTube transcripts; without it videos stay title-only
 mkdir -p backlog && cp ~/Nextcloud/"LLM wiki"/_config/page-prompt.md backlog/
 ```
 
 ## 2. Export (once)
 
 ```bash
-uv run rss-digest --config config.backlog.toml backlog-export --transcripts
+uv run rss-digest --config config.backlog.toml backlog-export
 ```
 
 This takes a while:
 
 - It reads the web page of every thin item. Expect 10–20 minutes, or up to about 2 hours if many
   pages time out.
-- It fetches subtitles for about 450 videos, another 20–40 minutes. YouTube may throttle it.
+- It fetches subtitles for about 450 videos (if `yt-dlp` is installed), another 20–40 minutes.
+  YouTube may throttle it.
   You can re-run the export until you assign topics (step 3). After that it refuses to run, because
   item numbers would change and `assignment.json` would point at the wrong articles.
 
@@ -75,8 +77,8 @@ title, item count, output file, item numbers.
 For each batch, say this in the session, changing the number of topics and agents:
 
 ```
-Take the first 20 lines of backlog/todo.txt and split them across 4 background agents on the Sonnet
-model, 5 topics each, giving each agent its lines and the prompt below.
+Take the first 8 lines of backlog/todo.txt and split them across 4 background agents on the Sonnet
+model, 2 topics each, giving each agent its lines and the prompt below.
 
 Agent prompt:
 You write topic pages for a personal knowledge base. Read backlog/page-prompt.md once; it gives the rules.

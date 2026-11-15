@@ -106,3 +106,4 @@ def dav():
 def no_page_fetch(monkeypatch):
     """Tests never touch the network: thin items stay thin unless a test stubs page_text itself."""
     monkeypatch.setattr("rss_digest.fetch.page_text", lambda url, client=None: None)
+    monkeypatch.setattr("rss_digest.fetch.yt_transcript", lambda url: None)

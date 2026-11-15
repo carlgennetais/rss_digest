@@ -5,64 +5,26 @@ and backlog-import writes those pages to the vault through the same code as the 
 """
 import json
 import logging
-import re
-import shutil
-import subprocess
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
 from .fetch import THIN, is_video
 from .models import Item
 from .textutil import safe_filename
-from .vault import mark_kept, write_topic_page
+from .vault import ITEM_TEXT_CAP, mark_kept, write_topic_page
 
 log = logging.getLogger(__name__)
-TEXT_CAP = 3000  # the same cap the API page writer uses
 
 
-def vtt_to_text(vtt: str) -> str:
-    """Subtitle text without the header, cue numbers, timings and tags; auto-captions repeat lines."""
-    out: list[str] = []
-    for line in vtt.splitlines():
-        line = re.sub(r"<[^>]+>", "", line).strip()
-        if not line or line == "WEBVTT" or line.isdigit() or "-->" in line or line.startswith(("Kind:", "Language:")):
-            continue
-        if not out or out[-1] != line:
-            out.append(line)
-    return "\n".join(out)
-
-
-def yt_transcript(url: str) -> str | None:
-    """English or French subtitles of a video via yt-dlp, or None if unavailable."""
-    if shutil.which("yt-dlp") is None:
-        return None
-    with tempfile.TemporaryDirectory() as tmp:
-        try:
-            # no check=True: yt-dlp exits non-zero when one of several matching tracks fails (often HTTP 429),
-            # even though it already saved a usable one
-            subprocess.run(["yt-dlp", "--skip-download", "--write-subs", "--write-auto-subs", "--sleep-subtitles", "1",
-                            "--sub-langs", "en.*,fr.*", "--sub-format", "vtt", "-o", f"{tmp}/t", url],
-                           capture_output=True, timeout=120)
-        except (subprocess.SubprocessError, OSError):
-            return None
-        vtts = sorted(Path(tmp).glob("*.vtt"))
-        return vtt_to_text(vtts[0].read_text(encoding="utf-8", errors="replace")) if vtts else None
-
-
-def export(items, out: Path, transcript=None) -> int:
+def export(items, out: Path) -> int:
     """Writes out/items/<n>.json and out/titles.tsv; returns the number of items."""
     if (out / "assignment.json").exists():
         # item numbers would change and assignment.json would point at the wrong articles
         raise FileExistsError(f"{out / 'assignment.json'} exists: topics were already assigned to this export")
     (out / "items").mkdir(parents=True, exist_ok=True)
     rows = ["n\tsource\tdate\tfeed\ttags\tthin\ttitle"]
-    found = 0
     for n, it in enumerate(items, 1):
-        video, text = is_video(it.url), it.text
-        if video and transcript and len(text) < THIN and (t := transcript(it.url)):
-            text, found = t, found + 1
-        text = text[:TEXT_CAP]
+        video, text = is_video(it.url), it.text[:ITEM_TEXT_CAP]
         thin = len(text) < THIN
         (out / "items" / f"{n}.json").write_text(json.dumps({
             "id": it.id, "source": it.source, "url": it.url, "title": it.title, "feed": it.feed,
@@ -73,8 +35,6 @@ def export(items, out: Path, transcript=None) -> int:
         rows.append(f"{n}\t{it.source}\t{it.published.date()}\t{clean(it.feed)}\t{clean(','.join(it.tags))}\t"
                     f"{'thin' if thin else ''}\t{clean(it.title)}")
     (out / "titles.tsv").write_text("\n".join(rows) + "\n", encoding="utf-8")
-    if transcript:
-        log.info("Transcripts found for %d videos", found)
     return len(items)
 
 

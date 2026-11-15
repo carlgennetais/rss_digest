@@ -18,6 +18,7 @@ ASSIGN_PROMPT = (
 )
 WRITER_FORMAT = ('\n\nReply with JSON only: {"description": "<one line>", "summary": "<markdown, no ## headings>", '
                  '"recent": "<markdown bullets>"}')
+ITEM_TEXT_CAP = 100_000  # characters per article (about an hour of transcript); 6 of ~1,900 kept items are longer
 
 
 @dataclass
@@ -108,7 +109,7 @@ def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) 
         return
     user = (f"Topic: {title}\n\n## Current summary\n{page.summary}\n\n## Current recent changes\n{page.recent}\n\n"
             f"## My notes (read-only context, never rewrite)\n{page.my_notes_tail}\n\n## New articles\n"
-            + "\n\n".join(f"Title: {i.title}\nURL: {i.url}\n{strip_md_images(i.text)[:3000]}" for i in items))
+            + "\n\n".join(f"Title: {i.title}\nURL: {i.url}\n{strip_md_images(i.text)[:ITEM_TEXT_CAP]}" for i in items))
     reply = llm.chat_json(writer_model, page_prompt + WRITER_FORMAT, user)
     if not (isinstance(reply, dict) and isinstance(reply.get("summary"), str)
             and isinstance(reply.get("recent"), str)):

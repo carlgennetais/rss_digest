@@ -1,6 +1,11 @@
 """Reads an article's web page when the text stored by FreshRSS or Wallabag is thin or empty."""
 import dataclasses
 import logging
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -42,16 +47,46 @@ def page_text(url: str, client: httpx.Client | None = None) -> str | None:
     return text if len(text) >= MIN_PAGE_TEXT else None
 
 
-def enrich(items: list[Item], fetch=None) -> list[Item]:
-    """Replaces thin text with the article's page text where the page can be read."""
+def vtt_to_text(vtt: str) -> str:
+    """Subtitle text without the header, cue numbers, timings and tags; auto-captions repeat lines."""
+    out: list[str] = []
+    for line in vtt.splitlines():
+        line = re.sub(r"<[^>]+>", "", line).strip()
+        if not line or line == "WEBVTT" or line.isdigit() or "-->" in line or line.startswith(("Kind:", "Language:")):
+            continue
+        if not out or out[-1] != line:
+            out.append(line)
+    return "\n".join(out)
+
+
+def yt_transcript(url: str) -> str | None:
+    """English or French subtitles of a video via yt-dlp, or None if unavailable."""
+    if shutil.which("yt-dlp") is None:
+        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            # no check=True: yt-dlp exits non-zero when one of several matching tracks fails (often HTTP 429),
+            # even though it already saved a usable one
+            subprocess.run(["yt-dlp", "--skip-download", "--write-subs", "--write-auto-subs", "--sleep-subtitles", "1",
+                            "--sub-langs", "en.*,fr.*", "--sub-format", "vtt", "-o", f"{tmp}/t", url],
+                           capture_output=True, timeout=120)
+        except (subprocess.SubprocessError, OSError):
+            return None
+        vtts = sorted(Path(tmp).glob("*.vtt"))
+        return vtt_to_text(vtts[0].read_text(encoding="utf-8", errors="replace")) if vtts else None
+
+
+def enrich(items: list[Item], fetch=None, transcript=None) -> list[Item]:
+    """Replaces thin text with the article's page text, or a video's subtitles, where they can be read."""
     fetch = fetch or page_text  # resolved per call, so tests can stub the module attribute
+    transcript = transcript or yt_transcript
     out, tried, improved = [], 0, 0
     for it in items:
-        if len(it.text) < THIN and it.url and not is_video(it.url):
+        if len(it.text) < THIN and it.url:
             tried += 1
-            try:
-                text = fetch(it.url)
-            except Exception:  # one odd URL must never stop a run
+            try:  # one odd URL or video must never stop a run
+                text = transcript(it.url) if is_video(it.url) else fetch(it.url)
+            except Exception:
                 log.warning("reading %s failed", it.url, exc_info=True)
                 text = None
             if text and len(text) > len(it.text):
@@ -59,5 +94,5 @@ def enrich(items: list[Item], fetch=None) -> list[Item]:
                 improved += 1
         out.append(it)
     if tried:
-        log.info("Read %d web pages for thin items: %d improved, %d failed", tried, improved, tried - improved)
+        log.info("Read %d pages or transcripts for thin items: %d improved, %d failed", tried, improved, tried - improved)
     return out

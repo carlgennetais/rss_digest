@@ -19,6 +19,7 @@ sudo useradd --system --home /var/lib/rss-digest --create-home rss-digest
 sudo git clone <repo-url> /opt/rss-digest
 curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh   # if uv is not installed
 cd /opt/rss-digest && sudo uv sync --locked --no-dev
+sudo env UV_TOOL_BIN_DIR=/usr/local/bin uv tool install yt-dlp   # video transcripts; upgrade it now and then
 sudo mkdir -p /etc/rss-digest
 sudo cp config.example.toml /etc/rss-digest/carl_pro.toml   # edit it, then chown/chmod as above
 sudo cp deploy/rss-digest@.service deploy/rss-digest@.timer /etc/systemd/system/

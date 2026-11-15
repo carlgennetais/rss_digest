@@ -178,3 +178,11 @@ def test_daily_reads_the_page_of_a_thin_kept_item(env, monkeypatch):
     daily(env)
     writer_prompt = env.llm.calls[1][3]
     assert "Full page text." in writer_prompt
+
+
+def test_daily_uses_the_transcript_of_a_saved_video(env, monkeypatch):
+    monkeypatch.setattr("rss_digest.fetch.yt_transcript", lambda url: "The talk transcript. " * 50)
+    env.wb = FakeWallabag([item("talk", url="https://www.youtube.com/watch?v=x")])
+    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}])
+    daily(env)
+    assert "The talk transcript." in env.llm.calls[1][3]

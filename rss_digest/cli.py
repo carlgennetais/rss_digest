@@ -100,9 +100,9 @@ def run_backlog(conf, fresh, wb, dav, llm, state) -> None:
     log.info("Backlog done.")
 
 
-def run_export(fresh, wb, state, out: Path, transcripts: bool) -> int:
+def run_export(fresh, wb, state, out: Path) -> int:
     items = enrich(select_new_kept(fresh.starred() + wb.entries(None), state))
-    n = backlog.export(items, out, transcript=backlog.yt_transcript if transcripts else None)
+    n = backlog.export(items, out)
     log.info("Exported %d items to %s", n, out)
     return n
 
@@ -119,7 +119,6 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", required=True, type=Path)
     ap.add_argument("command", choices=["run", "backlog", "backlog-export", "backlog-import"])
     ap.add_argument("--dir", type=Path, default=Path("backlog"), help="backlog-export/-import folder")
-    ap.add_argument("--transcripts", action="store_true", help="backlog-export: YouTube subtitles via yt-dlp")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr,
                         format="%(asctime)s %(levelname)s %(message)s")
@@ -132,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "run":
             run_daily(conf, *clients, now=datetime.now(UTC))
         elif args.command == "backlog-export":
-            run_export(fresh, wb, state, args.dir, args.transcripts)
+            run_export(fresh, wb, state, args.dir)
         elif args.command == "backlog":
             run_backlog(conf, *clients)
         else:

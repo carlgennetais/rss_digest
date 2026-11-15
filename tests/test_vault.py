@@ -199,3 +199,10 @@ def test_dedup_keeps_the_copy_with_most_text(state):
     star = item("Same", url="https://ex.com/p", id="freshrss:1", text="")
     saved = item("Same", url="https://ex.com/p?utm_source=x", id="wallabag:9", text="full article " * 100)
     assert [i.id for i in select_new_kept([star, saved], state)] == ["wallabag:9"]
+
+
+def test_writer_gets_full_article_text(dav, state):
+    long = item("a", text="w" * 5000 + "END")
+    llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}])
+    run([long], dav, state, llm)
+    assert "w" * 5000 + "END" in llm.calls[1][3]
