@@ -5,30 +5,30 @@
 state_path = "/var/lib/rss-digest/carl_pro.db"
 
 [freshrss]
-url = "https://example.com/rss"   # FreshRSS base URL (without /api/greader.php)
+url = "https://example.com/rss" # FreshRSS base URL (without /api/greader.php)
 user = "carl_pro"
-api_password = "..."              # FreshRSS > Profile > API password
+api_password = "..."            # FreshRSS > Profile > API password
 
 [wallabag]
 url = "https://example.com/wallabag"
-client_id = "..."                 # Wallabag > API clients management
+client_id = "..."                    # Wallabag > API clients management
 client_secret = "..."
 username = "carl_pro"
 password = "..."
 
 [nextcloud]
 url = "https://example.com/nextcloud"
-user = "carl_pro"
-app_password = "..."              # Nextcloud > Settings > Security > App passwords
-vault_path = "RSS Vault"          # vault folder, relative to the user's files root
+user = "carl"
+app_password = "..."                  # Nextcloud > Settings > Security > App passwords
+vault_path = "RSS Vault"              # vault folder, relative to the user's files root
 
 [llm]
-base_url = "https://api.openai.com/v1"   # any OpenAI-compatible endpoint
+base_url = "https://api.openai.com/v1" # any OpenAI-compatible endpoint
 api_key = "..."
-cheap_model = "gpt-4.1-mini"             # ranking and topic assignment
-writer_model = "gpt-4.1"                 # summaries and topic pages
-max_tokens_per_run = 200000              # optional; the run stops cleanly when reached
+cheap_model = "gpt-4.1-mini"           # ranking and topic assignment
+writer_model = "gpt-4.1"               # summaries and topic pages
+max_tokens_per_run = 200000            # optional; the run stops cleanly when reached
 
-[digest]          # optional section
+[digest] # optional section
 top_n = 15        # articles summarised
 also_notable = 10 # titles listed under "Also notable"

@@ -33,7 +33,7 @@ Success, in his words:
 ## Anti-goals (failure even if it "works")
 
 - Overwriting anything Carl wrote.
-- Any data crossing between personal and work instances.
+- Any data crossing between personal and work *sources*: the work instance never reads personal FreshRSS/Wallabag, and vice versa. (Vaults may live in one Nextcloud, see Decided by Carl.)
 - A digest that is long enough that he stops reading it.
 - Topic pages filled with content he never chose to keep.
 
@@ -42,7 +42,7 @@ Success, in his words:
 - Runs on the Yunohost box (old laptop, 24/7) alongside Nextcloud, FreshRSS, Wallabag. Light on CPU/RAM; no local models.
 - Cloud LLM is acceptable (including for work content).
 - Separate users per context: `carl` (personal), `carl_pro` (work). Each has its own FreshRSS, Wallabag, Nextcloud.
-- Vault = a plain Markdown folder in the user's Nextcloud, opened with Obsidian on desktop (Bluefin Linux) and Android (work profile for work).
+- Vault = a plain Markdown folder in a Nextcloud (the work vault lives in `carl`'s Nextcloud), opened with Obsidian on desktop (Bluefin Linux) and Android (work profile for work).
 - Joplin is end-to-end encrypted, so the server can't read or write it; the vault is separate from Joplin.
 - Cost target: a few euros/month per instance.
 
@@ -121,6 +121,7 @@ An existing Obsidian community plugin that chats over the vault with a configura
 - Approach A with an editable prompt file.
 - Work instance first.
 - Private GitHub repo `rss_digest`.
+- 2026-11-15: the work vault (`LLM wiki`) lives in the personal Nextcloud (`carl`), fed only by `carl_pro`'s FreshRSS and Wallabag.
 
 ## My calls (correct if wrong)
 
