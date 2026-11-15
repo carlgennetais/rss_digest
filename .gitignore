@@ -6,3 +6,4 @@ __pycache__/
 !config.example.toml
 !pyproject.toml
 .superpowers/
+bench-out/

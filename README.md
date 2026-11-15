@@ -80,3 +80,18 @@ The feed is public to anyone with the link; keep that URL out of this repo.
 uv sync
 uv run pytest
 ```
+
+## Comparing models
+
+`rss_digest.bench` compares models on your own data before you pick `cheap_model` and `writer_model`.
+It only reads from FreshRSS, Wallabag and the vault. Point `[llm]` at OpenRouter to try many models with one key.
+
+```
+# ranking: how many of your stars from the last 21 days each model puts in the daily top 15
+uv run python -m rss_digest.bench --config c.toml rank --models model-a,model-b --days 21
+# writing: the same topic page from your 8 latest Wallabag entries with that tag, saved as
+# bench-out/<topic>/A.md, B.md... in random order; bench-out/key.txt says which model is which
+uv run python -m rss_digest.bench --config c.toml write --models a,b,c --topic "Kubernetes=k8s" --topic "dbt=dbt"
+```
+
+`bench-out/` holds article text and is git-ignored.
