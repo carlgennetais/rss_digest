@@ -69,15 +69,26 @@ def _llm(conf, max_tokens):
     return llm
 
 
-def bench_rank(conf, models, days, max_tokens):
+def bench_rank(conf, models, days, max_tokens, out: Path):
     fresh = FreshRSS(conf.freshrss)
     items = fresh.reading_list(since=datetime.now(UTC) - timedelta(days=days))
     starred = {i.id for i in fresh.starred()}
     interests = parse_interests(_config_text(WebDAV(conf.nextcloud), "interests.md"))
-    for model in models:
-        llm = _llm(conf, max_tokens)
-        hits, total = recall_at_k(items, starred, lambda its: [i for i, _ in rank(its, interests, "", llm, model)])
-        print(f"{model}: {hits}/{total} starred articles in the daily top {TOP_K} "
+    with open(out / "ranking.tsv", "w", encoding="utf-8") as tsv:
+        tsv.write("model\tday\trank\tscore\tstarred\tin_top\tfeed\ttitle\turl\n")
+        for model in models:
+            llm = _llm(conf, max_tokens)
+
+            def ranker(its, llm=llm, model=model):
+                ranked = rank(its, interests, "", llm, model)
+                for n, (i, score) in enumerate(ranked, 1):
+                    title = " ".join(i.title.split())
+                    tsv.write(f"{model}\t{i.published.date()}\t{n}\t{score:g}\t{'*' if i.id in starred else ''}\t"
+                              f"{'yes' if n <= TOP_K else ''}\t{i.feed}\t{title}\t{i.url}\n")
+                return [i for i, _ in ranked]
+
+            hits, total = recall_at_k(items, starred, ranker)
+            print(f"{model}: {hits}/{total} starred articles in the daily top {TOP_K} "
               f"({hits / total:.0%}), {llm.tokens_used} tokens" if total else f"{model}: no starred articles found")
 
 
@@ -114,6 +125,7 @@ def main(argv=None):
     r = sub.add_parser("rank")
     r.add_argument("--models", required=True)
     r.add_argument("--days", type=int, default=21)
+    r.add_argument("--out", type=Path, default=Path("bench-out"))
     w = sub.add_parser("write")
     w.add_argument("--models", required=True)
     w.add_argument("--topic", action="append", required=True, help='"Title=wallabag-tag", repeatable')
@@ -121,10 +133,10 @@ def main(argv=None):
     args = ap.parse_args(argv)
     conf = load_config(args.config)
     models = args.models.split(",")
+    args.out.mkdir(parents=True, exist_ok=True)
     if args.cmd == "rank":
-        bench_rank(conf, models, args.days, args.max_tokens)
+        bench_rank(conf, models, args.days, args.max_tokens, args.out)
     else:
-        args.out.mkdir(parents=True, exist_ok=True)
         bench_write(conf, models, args.topic, args.out, args.max_tokens)
 
 
