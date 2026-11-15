@@ -38,7 +38,6 @@ class LLM:
                     headers={"Authorization": f"Bearer {self.conf.api_key}"},
                     json={
                         "model": model,
-                        "temperature": 0.2,
                         "messages": [
                             {"role": "system", "content": system},
                             {"role": "user", "content": user},

@@ -42,7 +42,7 @@ def test_chat_posts_openai_shape_and_counts_tokens():
     body = json.loads(req.content)
     assert str(req.url) == "http://x/v1/chat/completions"
     assert req.headers["Authorization"] == "Bearer k"
-    assert body["model"] == "m" and body["temperature"] == 0.2
+    assert body["model"] == "m" and "temperature" not in body
     assert body["messages"] == [
         {"role": "system", "content": "sys"},
         {"role": "user", "content": "hi"},
