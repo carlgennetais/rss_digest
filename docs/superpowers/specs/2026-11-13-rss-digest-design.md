@@ -122,6 +122,7 @@ An existing Obsidian community plugin that chats over the vault with a configura
 - Work instance first.
 - Private GitHub repo `rss_digest`.
 - 2026-11-15: the work vault (`LLM wiki`) lives in the personal Nextcloud (`carl`), fed only by `carl_pro`'s FreshRSS and Wallabag.
+- 2026-11-16: models via OpenRouter, chosen by benchmark on Carl's data: `cheap_model` = Claude Haiku 5.5, `writer_model` = Claude Sonnet 5.5.
 
 ## My calls (correct if wrong)
 
