@@ -193,3 +193,9 @@ def test_assignment_prompt_includes_wallabag_tags(dav, state):
     run([tagged, item("b")], dav, state, llm)
     user = llm.calls[0][3]
     assert "1. a (Ex Blog) [tags: kubernetes, security]" in user and "2. b (Ex Blog)\n" in user + "\n"
+
+
+def test_dedup_keeps_the_copy_with_most_text(state):
+    star = item("Same", url="https://ex.com/p", id="freshrss:1", text="")
+    saved = item("Same", url="https://ex.com/p?utm_source=x", id="wallabag:9", text="full article " * 100)
+    assert [i.id for i in select_new_kept([star, saved], state)] == ["wallabag:9"]

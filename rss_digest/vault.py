@@ -54,7 +54,7 @@ def _keys(it) -> list[str]:
 
 def select_new_kept(items, state) -> list:
     seen, out = set(), []
-    for it in items:
+    for it in sorted(items, key=lambda it: -len(it.text)):  # of duplicates, keep the copy with the most text
         keys = _keys(it)
         if state.is_processed(it.id) or any(state.has_key(k) or k in seen for k in keys):
             continue
