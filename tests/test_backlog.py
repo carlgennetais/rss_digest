@@ -49,6 +49,7 @@ PAGE = {"description": "d", "summary": "s", "recent": "- r"}
 
 
 def setup(folder, items, assignment, out=None, out_raw=None):
+    (folder / "assignment.json").unlink(missing_ok=True)  # a fresh export; export refuses once topics exist
     export(items, folder)
     (folder / "assignment.json").write_text(json.dumps(assignment))
     (folder / "out").mkdir(exist_ok=True)
@@ -108,3 +109,13 @@ def test_run_import_prints_counts_and_state_reminder(tmp_path, dav, state, capsy
     run_import(dav, state, tmp_path, tmp_path / "state.db")
     printed = capsys.readouterr().out
     assert "written: 1" in printed and f"Copy {tmp_path / 'state.db'} to the server" in printed
+
+
+def test_export_refuses_once_topics_are_assigned(tmp_path):
+    import pytest
+
+    export([item("a")], tmp_path)
+    (tmp_path / "assignment.json").write_text("{}")
+    with pytest.raises(FileExistsError):
+        export([item("b")], tmp_path)
+    assert json.loads((tmp_path / "items/1.json").read_text())["title"] == "a"

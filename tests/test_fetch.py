@@ -54,3 +54,19 @@ def test_enrich_only_thin_non_video_and_keeps_text_on_failure():
     out = enrich([full, thin, video, dead], fetch=fetch)
     assert calls == ["https://ex.com/t", "https://ex.com/d"]
     assert out[1].text.startswith("page") and out[0] == full and out[2] == video and out[3] == dead
+
+
+def test_enrich_survives_a_fetch_that_raises():
+    def boom(url):
+        raise httpx.InvalidURL("bad")  # not an httpx.HTTPError subclass
+
+    out = enrich([item("t", url="http://[::1")], fetch=boom)
+    assert out[0].text == ""
+
+
+def test_page_text_handles_invalid_url():
+    assert page_text("http://[::1") is None
+
+
+def test_is_video_on_malformed_url():
+    assert is_video("http://[::1") is False

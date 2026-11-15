@@ -50,6 +50,9 @@ def yt_transcript(url: str) -> str | None:
 
 def export(items, out: Path, transcript=None) -> int:
     """Writes out/items/<n>.json and out/titles.tsv; returns the number of items."""
+    if (out / "assignment.json").exists():
+        # item numbers would change and assignment.json would point at the wrong articles
+        raise FileExistsError(f"{out / 'assignment.json'} exists: topics were already assigned to this export")
     (out / "items").mkdir(parents=True, exist_ok=True)
     rows = ["n\tsource\tdate\tfeed\ttags\tthin\ttitle"]
     found = 0

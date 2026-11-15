@@ -16,7 +16,10 @@ USER_AGENT = "rss-digest (+personal reader)"
 
 
 def is_video(url: str) -> bool:
-    host = urlparse(url).netloc.lower()
+    try:
+        host = urlparse(url).netloc.lower()
+    except ValueError:  # malformed URL, e.g. an unclosed IPv6 bracket
+        return False
     return "youtube.com" in host or "youtu.be" in host
 
 
@@ -33,7 +36,7 @@ def page_text(url: str, client: httpx.Client | None = None) -> str | None:
                 if len(body) > MAX_BYTES:
                     return None
             html = body.decode(r.encoding or "utf-8", errors="replace")
-    except httpx.HTTPError:
+    except (httpx.HTTPError, httpx.InvalidURL, ValueError, LookupError):  # LookupError: bad charset
         return None
     text = html_to_text(html, main_only=True)
     return text if len(text) >= MIN_PAGE_TEXT else None
@@ -46,7 +49,11 @@ def enrich(items: list[Item], fetch=None) -> list[Item]:
     for it in items:
         if len(it.text) < THIN and it.url and not is_video(it.url):
             tried += 1
-            text = fetch(it.url)
+            try:
+                text = fetch(it.url)
+            except Exception:  # one odd URL must never stop a run
+                log.warning("reading %s failed", it.url, exc_info=True)
+                text = None
             if text and len(text) > len(it.text):
                 it = dataclasses.replace(it, text=text)
                 improved += 1

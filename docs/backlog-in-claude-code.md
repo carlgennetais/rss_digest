@@ -36,7 +36,8 @@ This takes a while:
 - It reads the web page of every thin item. Expect 10–20 minutes, or up to about 2 hours if many
   pages time out.
 - It fetches subtitles for about 450 videos, another 20–40 minutes. YouTube may throttle it.
-  Re-running is safe.
+  You can re-run the export until you assign topics (step 3). After that it refuses to run, because
+  item numbers would change and `assignment.json` would point at the wrong articles.
 
 It writes `backlog/items/<n>.json` and `backlog/titles.tsv`.
 
