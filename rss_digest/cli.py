@@ -106,6 +106,14 @@ def run_export(fresh, wb, state, out: Path, transcripts: bool) -> int:
     log.info("Exported %d items to %s", n, out)
     return n
 
+def run_import(dav, state, folder: Path, state_path: Path) -> dict[str, int]:
+    counts = backlog.import_pages(folder, dav, state, _config_text(dav, "page-prompt.md"))
+    print(", ".join(f"{k}: {v}" for k, v in counts.items()))
+    print(f"Still to write: {folder / 'todo.txt'}")
+    if counts["written"]:
+        print(f"Copy {state_path} to the server before enabling the daily timer.")
+    return counts
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="rss-digest")
     ap.add_argument("--config", required=True, type=Path)
@@ -128,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "backlog":
             run_backlog(conf, *clients)
         else:
-            raise NotImplementedError(args.command)
+            run_import(dav, state, args.dir, conf.state_path)
     except Exception:
         log.exception("rss-digest failed")
         return 1
