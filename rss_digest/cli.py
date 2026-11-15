@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .config import load_config
 from .digest import build_digest
+from .feed import update_feed
 from .freshrss import FreshRSS
 from .interests import filter_items, parse_interests
 from .llm import LLM, BudgetExceeded
@@ -76,6 +77,10 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
         md += f"\n{notice}\n"
     dav.write(f"Digest/{now.date().isoformat()}.md", md)
     state.set("last_digest_run", now.isoformat())
+    try:  # the feed is a convenience copy: a failure here must not fail the run
+        dav.write("Feed/digest.xml", update_feed(dav.read("Feed/digest.xml"), now.date(), md, now))
+    except Exception:
+        log.exception("feed update failed")
     if isinstance(vault_error, Exception):
         raise vault_error
 

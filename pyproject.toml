@@ -7,7 +7,11 @@ name = "rss-digest"
 version = "0.1.0"
 description = "Daily FreshRSS digest and LLM-maintained topic pages in an Obsidian vault"
 requires-python = ">=3.11"
-dependencies = ["httpx", "PyYAML"]
+dependencies = [
+    "httpx",
+    "markdown>=3.11.3",
+    "PyYAML",
+]
 
 [dependency-groups]
 dev = ["pytest"]

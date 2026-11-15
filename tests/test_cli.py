@@ -164,3 +164,8 @@ def test_main_quiets_httpx_request_logs(tmp_path):
     import logging
     main(["--config", str(tmp_path / "missing.toml"), "run"])
     assert logging.getLogger("httpx").level == logging.WARNING
+
+
+def test_daily_writes_public_feed(env):
+    daily(env)
+    assert "Digest " + NOW.date().isoformat() in env.dav.files["Feed/digest.xml"]

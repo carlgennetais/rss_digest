@@ -60,6 +60,13 @@ If you edit an AI-written section of a topic page, the page is left untouched an
 under "Pages not updated". It stays that way; v1 has no automatic release. Your own "My notes" section is
 always preserved.
 
+## Digest feed
+
+Each run also adds the digest to `Feed/digest.xml`, an Atom feed of the last 30 digests. To read it in
+FreshRSS or FeedMe, share the `Feed/` **folder** (not the file: each write replaces the file) as a public
+link in Nextcloud, then subscribe to `https://<nextcloud>/s/<token>/download?path=/&files=digest.xml`.
+The feed is public to anyone with the link; keep that URL out of this repo.
+
 ## Obsidian setup
 
 - Settings > Files and links: attachments folder `_attachments/`, Wikilinks off (Markdown links).
