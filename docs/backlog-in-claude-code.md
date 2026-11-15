@@ -1,0 +1,112 @@
+# Backlog import in a Claude Code session
+
+Imports the existing stars and Wallabag entries into the vault's topic pages, using Sonnet agents in a
+Claude Code session instead of paid API calls. It runs in batches, so you can stop when your plan's
+usage limit is near and continue another day.
+
+Agents never write to the vault. They write JSON files into `backlog/`, and `backlog-import` writes
+the pages through the program's normal code: your `## My notes` sections are protected, edited pages
+are left alone, and items are marked processed in the state database.
+
+## Before you start
+
+- **Usage:** each topic page needs about 10–20k tokens: its articles' text in, about 700 tokens out.
+  The whole backlog (about 1,500 items, 80–150 topics) is about 1.5–2M Sonnet tokens of your plan.
+  Batches of about 20 topics keep each session to roughly 300k tokens.
+- **What goes through your account:** your work articles' text and your interests go through your
+  personal Claude account. Scripted bulk use isn't clearly "ordinary" plan use.
+- **`backlog/` holds article text.** It is git-ignored. Delete it when you're done.
+
+## 1. Setup (once)
+
+```bash
+cp config.toml config.backlog.toml          # then set: state_path = "backlog/state.db"
+brew install yt-dlp                          # optional: YouTube transcripts
+mkdir -p backlog && cp ~/Nextcloud/"LLM wiki"/_config/page-prompt.md backlog/
+```
+
+## 2. Export (once)
+
+```bash
+uv run rss-digest --config config.backlog.toml backlog-export --transcripts
+```
+
+This takes a while:
+
+- It reads the web page of every thin item. Expect 10–20 minutes, or up to about 2 hours if many
+  pages time out.
+- It fetches subtitles for about 450 videos, another 20–40 minutes. YouTube may throttle it.
+  Re-running is safe.
+
+It writes `backlog/items/<n>.json` and `backlog/titles.tsv`.
+
+## 3. Assign topics (once, one agent)
+
+In a Claude Code session in this repo, with the session on Sonnet (`/model sonnet`), say:
+
+```
+Read backlog/titles.tsv (columns: n, source, date, feed, tags, thin, title). Group these saved articles
+into 80 to 150 topics, each named the way a person would title a note in a knowledge base (e.g. "DuckDB",
+"Semantic layers", "Neovim"). Use the tags column as a strong hint. Give every article 1 or 2 topics;
+an article that fits no lasting topic goes to "Misc". Write backlog/assignment.json as
+{"<n>": ["Topic", ...]} using only n values from the file, and backlog/topics.md listing each topic
+with its article count, biggest first. Do not read the items folder and do not write anything else.
+```
+
+## 4. Review the topics
+
+Read `backlog/topics.md`. Rename or merge topics now by editing `backlog/assignment.json`, because
+each topic name becomes a page in your vault.
+
+Then create the first to-do list (this writes nothing to the vault yet):
+
+```bash
+uv run rss-digest --config config.backlog.toml backlog-import
+```
+
+`backlog/todo.txt` has one line per page still to write, biggest first, with tab-separated columns:
+title, item count, output file, item numbers.
+
+## 5. Write pages, one batch at a time
+
+**First batch: a trial of 2 topics.** Check those pages in Obsidian before doing more.
+
+For each batch, say this in the session, changing the number of topics and agents:
+
+```
+Take the first 20 lines of backlog/todo.txt and split them across 4 background agents on the Sonnet
+model, 5 topics each, giving each agent its lines and the prompt below.
+
+Agent prompt:
+You write topic pages for a personal knowledge base. Read backlog/page-prompt.md once; it gives the rules.
+For each of your lines from backlog/todo.txt (columns: title, item count, output file, item numbers):
+read backlog/items/<n>.json for each item number (fields: title, url, feed, published, text, thin, video).
+Write backlog/out/<output file> containing only this JSON:
+{"description": "<one line, at most 20 words>", "summary": "<markdown, at most 250 words, no ## headings>",
+ "recent": "<markdown bullets, at most 5, newest first, each starting with the article's date>"}
+Use only what the items say. An item marked thin has little text: use its title and don't guess its content.
+No images. Don't use web tools. Don't write any other file.
+```
+
+After the agents finish, or when you stop because of your usage limit:
+
+```bash
+uv run rss-digest --config config.backlog.toml backlog-import
+```
+
+- **What it does:** writes the finished pages to the vault over WebDAV, and Nextcloud syncs them to
+  `~/Nextcloud/LLM wiki/Topics/`. It then rewrites `todo.txt` with what's left.
+- **Safe to re-run:** pages already written are not duplicated.
+- **Bad agent output:** a missing or broken JSON file just stays on the to-do list.
+- **Edited pages:** if you edited a topic page in Obsidian between batches, that page is reported as
+  `flagged` and left as you wrote it.
+
+Repeat step 5 until `todo.txt` is empty.
+
+## 6. Hand over to the server
+
+Before enabling `rss-digest@carl_pro.timer`, copy `backlog/state.db` to `/var/lib/rss-digest/carl_pro.db`
+(owner `rss-digest`, mode 600). It holds which items are done and the fingerprint of every page. Without
+it, the server treats every topic page as edited by you and never updates them.
+
+Then delete `backlog/` and `config.backlog.toml`.
