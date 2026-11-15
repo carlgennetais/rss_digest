@@ -12,3 +12,4 @@ class Item:
     published: datetime  # tz-aware UTC
     feed: str
     tags: tuple[str, ...] = ()
+    read: bool = False  # FreshRSS only: the reader has seen it

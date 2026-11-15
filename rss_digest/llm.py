@@ -26,6 +26,7 @@ class LLM:
         self.base = conf.base_url.rstrip("/")
         self.client = client or httpx.Client(timeout=120)
         self.tokens_used = 0
+        self.cost = 0.0  # USD, when the provider reports it (OpenRouter does)
         self.limit = conf.max_tokens_per_run
 
     def chat(self, model: str, system: str, user: str) -> str:
@@ -64,6 +65,8 @@ class LLM:
         usage = data.get("usage") if isinstance(data, dict) else None
         total = usage.get("total_tokens") if isinstance(usage, dict) else None
         self.tokens_used += total if isinstance(total, int) else 0
+        cost = usage.get("cost") if isinstance(usage, dict) else None
+        self.cost += cost if isinstance(cost, (int, float)) else 0
         return content
 
     def chat_json(self, model: str, system: str, user: str) -> Any:

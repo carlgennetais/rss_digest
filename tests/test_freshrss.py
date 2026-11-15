@@ -68,3 +68,17 @@ def test_freshrss_login_failure_raises():
     rec = Recorder(lambda r: httpx.Response(401))
     with pytest.raises(httpx.HTTPStatusError):
         FreshRSS(conf, client=rec.client).starred()
+
+
+def test_read_state_comes_from_categories():
+    def h(request):
+        if request.url.path.endswith("/ClientLogin"):
+            return httpx.Response(200, text="Auth=TOKEN\n")
+        return httpx.Response(200, json={"items": [
+            entry(1, categories=["user/-/state/com.google/reading-list", "user/-/state/com.google/read"]),
+            entry(2, categories=["user/-/state/com.google/reading-list"]),
+            entry(3),
+        ]})
+
+    items = FreshRSS(conf, client=Recorder(h).client).reading_list(since=datetime(2026, 11, 1, tzinfo=UTC))
+    assert [i.read for i in items] == [True, False, False]

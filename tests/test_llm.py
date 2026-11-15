@@ -28,7 +28,7 @@ def make(replies, max_tokens=200000, usage=True):
             return r
         body = {"choices": [{"message": {"content": r}}]}
         if usage:
-            body["usage"] = {"total_tokens": 30}
+            body["usage"] = {"total_tokens": 30, "cost": 0.0015}
         return httpx.Response(200, json=body)
 
     rec = Recorder(handler)
@@ -47,7 +47,7 @@ def test_chat_posts_openai_shape_and_counts_tokens():
         {"role": "system", "content": "sys"},
         {"role": "user", "content": "hi"},
     ]
-    assert llm.tokens_used == 30
+    assert llm.tokens_used == 30 and llm.cost == 0.0015  # OpenRouter reports cost in usage
 
 
 def test_missing_usage_counts_zero():

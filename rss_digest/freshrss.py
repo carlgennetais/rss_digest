@@ -63,4 +63,5 @@ def _to_item(e: dict) -> Item:
         text=html_to_text(e.get("summary", {}).get("content", "")),
         published=datetime.fromtimestamp(e["published"], UTC),
         feed=e.get("origin", {}).get("title", ""),
+        read=any(c.endswith("/state/com.google/read") for c in e.get("categories", [])),
     )
