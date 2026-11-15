@@ -129,6 +129,41 @@ def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) 
     state.set_page_hash(safe_filename(title), ai_hash(out))
 
 
+def write_topic_page(stem: str, title: str, items: list, dav, state, llm, writer_model: str, page_prompt: str) -> str:
+    """Writes one topic page; returns "written", "flagged" (edited, unparsable or not ours) or "failed"."""
+    path = f"{TOPICS_DIR}/{stem}.md"
+    try:
+        text = dav.read(path)
+    except httpx.HTTPStatusError as e:
+        log.warning("reading page %s failed, skipping: %s", path, e)
+        return "failed"
+    if text is not None:
+        try:
+            bad = not is_topic_page(text) or ai_hash(text) != state.page_hash(stem)
+            if not bad:
+                parse_page(text)
+        except PageParseError:
+            bad = True
+        if bad:
+            log.warning("page %s was edited or is not ours, skipping", path)
+            return "flagged"
+    try:
+        _write_page(title, text, items, dav, state, llm, writer_model, page_prompt)
+    except (LLMError, httpx.HTTPStatusError) as e:
+        log.warning("writing page %s failed, skipping: %s", title, e)
+        return "failed"
+    return "written"
+
+
+def mark_kept(items: list, needs: dict[str, set[str]], written: set[str], state) -> None:
+    """Marks an item processed once every page it was assigned to is written."""
+    for it in items:
+        if needs[it.id] <= written:
+            state.mark_processed(it.id)
+            for k in _keys(it):
+                state.add_key(k)
+
+
 def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt, batch_size=20) -> list[str]:
     flagged: list[str] = []
     for start in range(0, len(items), batch_size):
@@ -148,33 +183,10 @@ def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt,
                 needs.setdefault(iid, set()).add(stem)
         done: set[str] = set()
         for stem, (title, page_items) in pages.items():
-            path = f"{TOPICS_DIR}/{stem}.md"
-            try:
-                text = dav.read(path)
-            except httpx.HTTPStatusError as e:
-                log.warning("reading page %s failed, skipping: %s", path, e)
-                continue
-            if text is not None:
-                try:
-                    bad = not is_topic_page(text) or ai_hash(text) != state.page_hash(stem)
-                    if not bad:
-                        parse_page(text)
-                except PageParseError:
-                    bad = True
-                if bad:
-                    log.warning("page %s was edited or is not ours, skipping", path)
-                    if title not in flagged:
-                        flagged.append(title)
-                    continue
-            try:
-                _write_page(title, text, page_items, dav, state, llm, writer_model, page_prompt)
-            except (LLMError, httpx.HTTPStatusError) as e:
-                log.warning("writing page %s failed, skipping: %s", title, e)
-                continue
-            done.add(stem)
-            for it in page_items:
-                if needs[it.id] <= done:
-                    state.mark_processed(it.id)
-                    for k in _keys(it):
-                        state.add_key(k)
+            result = write_topic_page(stem, title, page_items, dav, state, llm, writer_model, page_prompt)
+            if result == "flagged" and title not in flagged:
+                flagged.append(title)
+            if result == "written":
+                done.add(stem)
+                mark_kept(page_items, needs, done, state)  # now, so a budget stop keeps finished items
     return flagged
