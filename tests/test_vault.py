@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 from conftest import FakeLLM, item
 
@@ -183,3 +185,11 @@ def test_dav_error_on_one_page_skips_only_that_page(state, op):
     assert run([item("x"), item("y")], dav, state, llm) == []
     assert list(dav.files) == ["Topics/B.md"]
     assert not state.is_processed(item("x").id) and state.is_processed(item("y").id)
+
+
+def test_assignment_prompt_includes_wallabag_tags(dav, state):
+    tagged = dataclasses.replace(item("a"), tags=("kubernetes", "security"))
+    llm = FakeLLM(json_replies=[{"1": ["NEW: K8s"], "2": ["NEW: K8s"]}, W])
+    run([tagged, item("b")], dav, state, llm)
+    user = llm.calls[0][3]
+    assert "1. a (Ex Blog) [tags: kubernetes, security]" in user and "2. b (Ex Blog)\n" in user + "\n"

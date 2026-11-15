@@ -13,7 +13,8 @@ TOPICS_DIR = "Topics"
 
 ASSIGN_PROMPT = (
     "Assign each numbered article to at least one and at most 2 topics. Reply with JSON mapping every article "
-    'number to a list of topic titles: an existing title verbatim, or "NEW: Title" for a new topic.'
+    'number to a list of topic titles: an existing title verbatim, or "NEW: Title" for a new topic. '
+    "Tags were set by the reader: treat them as a strong hint, and keep articles that share a tag on the same topic."
 )
 WRITER_FORMAT = ('\n\nReply with JSON only: {"description": "<one line>", "summary": "<markdown, no ## headings>", '
                  '"recent": "<markdown bullets>"}')
@@ -80,7 +81,8 @@ def _assign(batch, topics, llm, cheap_model) -> dict[str, list]:
     """Returns {item id: [topic titles]}."""
     existing = {t.title.casefold(): t.title for t in topics}
     listing = "\n".join(f"- {t.title}: {t.description}" for t in topics) or "(none)"
-    numbered = "\n".join(f"{n}. {it.title} ({it.feed})" for n, it in enumerate(batch, 1))
+    numbered = "\n".join(f"{n}. {it.title} ({it.feed})" + (f" [tags: {', '.join(it.tags)}]" if it.tags else "")
+                         for n, it in enumerate(batch, 1))
     reply = llm.chat_json(cheap_model, ASSIGN_PROMPT, f"Existing topics:\n{listing}\n\nArticles:\n{numbered}")
     if not isinstance(reply, dict):
         raise LLMError("assignment reply is not an object")
