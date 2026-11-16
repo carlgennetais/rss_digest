@@ -89,3 +89,13 @@ def test_enrich_survives_a_transcript_that_raises():
         raise OSError("yt-dlp broke")
 
     assert enrich([item("v", url="https://youtu.be/a")], fetch=lambda u: None, transcript=boom)[0].text == ""
+
+
+def test_enrich_logs_progress_every_25_items(caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="rss_digest.fetch")
+    enrich([item(f"t{n}") for n in range(60)], fetch=lambda u: None, transcript=lambda u: None)
+    progress = [r.getMessage() for r in caplog.records if "/60" in r.getMessage()]
+    assert progress == ["Reading pages and transcripts: 25/60 (0 improved)",
+                        "Reading pages and transcripts: 50/60 (0 improved)"]

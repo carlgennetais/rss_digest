@@ -81,9 +81,12 @@ def enrich(items: list[Item], fetch=None, transcript=None) -> list[Item]:
     fetch = fetch or page_text  # resolved per call, so tests can stub the module attribute
     transcript = transcript or yt_transcript
     out, tried, improved = [], 0, 0
+    total = sum(1 for it in items if len(it.text) < THIN and it.url)
     for it in items:
         if len(it.text) < THIN and it.url:
             tried += 1
+            if tried % 25 == 0:
+                log.info("Reading pages and transcripts: %d/%d (%d improved)", tried, total, improved)
             try:  # one odd URL or video must never stop a run
                 text = transcript(it.url) if is_video(it.url) else fetch(it.url)
             except Exception:
