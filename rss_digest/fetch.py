@@ -9,6 +9,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from rich.console import Console
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn
 
 from .models import Item
 from .textutil import html_to_text
@@ -18,6 +20,7 @@ THIN = 1000  # characters: below this, the stored text is not enough to write fr
 MAX_BYTES = 2_000_000
 MIN_PAGE_TEXT = 500  # less than this is a bot-check, error or login page, not an article
 USER_AGENT = "rss-digest (+personal reader)"
+CONSOLE = Console(stderr=True)  # shared with the log handler so log lines don't break the progress bar
 
 
 def is_video(url: str) -> bool:
@@ -82,20 +85,32 @@ def enrich(items: list[Item], fetch=None, transcript=None) -> list[Item]:
     transcript = transcript or yt_transcript
     out, tried, improved = [], 0, 0
     total = sum(1 for it in items if len(it.text) < THIN and it.url)
-    for it in items:
-        if len(it.text) < THIN and it.url:
-            tried += 1
-            if tried % 25 == 0:
-                log.info("Reading pages and transcripts: %d/%d (%d improved)", tried, total, improved)
-            try:  # one odd URL or video must never stop a run
-                text = transcript(it.url) if is_video(it.url) else fetch(it.url)
-            except Exception:
-                log.warning("reading %s failed", it.url, exc_info=True)
-                text = None
-            if text and len(text) > len(it.text):
-                it = dataclasses.replace(it, text=text)
-                improved += 1
-        out.append(it)
+    # a live bar in a terminal; plain log lines every 25 items elsewhere (the server's journal)
+    bar = Progress(TextColumn("{task.description}"), BarColumn(), MofNCompleteColumn(), TimeRemainingColumn(),
+                   console=CONSOLE) if CONSOLE.is_terminal and total else None
+    if bar:
+        bar.start()
+        task = bar.add_task("Reading pages and transcripts", total=total)
+    try:
+        for it in items:
+            if len(it.text) < THIN and it.url:
+                tried += 1
+                if not bar and tried % 25 == 0:
+                    log.info("Reading pages and transcripts: %d/%d (%d improved)", tried, total, improved)
+                try:  # one odd URL or video must never stop a run
+                    text = transcript(it.url) if is_video(it.url) else fetch(it.url)
+                except Exception:
+                    log.warning("reading %s failed", it.url, exc_info=True)
+                    text = None
+                if text and len(text) > len(it.text):
+                    it = dataclasses.replace(it, text=text)
+                    improved += 1
+                if bar:
+                    bar.update(task, advance=1, description=f"Reading pages and transcripts ({improved} improved)")
+            out.append(it)
+    finally:
+        if bar:
+            bar.stop()
     if tried:
         log.info("Read %d pages or transcripts for thin items: %d improved, %d failed", tried, improved, tried - improved)
     return out

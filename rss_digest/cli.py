@@ -5,11 +5,13 @@ from datetime import UTC, datetime, timedelta
 from importlib import resources
 from pathlib import Path
 
+from rich.logging import RichHandler
+
+from . import backlog
 from .config import load_config
 from .digest import build_digest
-from . import backlog
 from .feed import update_feed
-from .fetch import enrich
+from .fetch import CONSOLE, enrich
 from .freshrss import FreshRSS
 from .interests import filter_items, parse_interests
 from .llm import LLM, BudgetExceeded
@@ -120,8 +122,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("command", choices=["run", "backlog", "backlog-export", "backlog-import"])
     ap.add_argument("--dir", type=Path, default=Path("backlog"), help="backlog-export/-import folder")
     args = ap.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, stream=sys.stderr,
-                        format="%(asctime)s %(levelname)s %(message)s")
+    if CONSOLE.is_terminal:  # interactive: rich log lines that coexist with the progress bar
+        logging.basicConfig(level=logging.INFO, format="%(message)s",
+                            handlers=[RichHandler(console=CONSOLE, show_path=False)])
+    else:
+        logging.basicConfig(level=logging.INFO, stream=sys.stderr,
+                            format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # one INFO line per request floods the journal
     try:
         conf = load_config(args.config)
