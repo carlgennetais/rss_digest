@@ -198,3 +198,7 @@ def test_daily_regenerates_the_index_when_pages_change(env):
 def test_daily_logs_the_digest(env):
     daily(env)
     assert f"## [{NOW.date()}] digest | 0 articles" in env.dav.files["log.md"]
+
+
+def test_main_lint_command_exists(tmp_path):
+    assert main(["--config", str(tmp_path / "missing.toml"), "lint"]) == 1  # parses, then fails on the config

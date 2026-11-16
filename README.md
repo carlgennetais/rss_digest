@@ -22,7 +22,7 @@ cd /opt/rss-digest && sudo uv sync --locked --no-dev
 sudo env UV_TOOL_BIN_DIR=/usr/local/bin uv tool install yt-dlp   # video transcripts; upgrade it now and then
 sudo mkdir -p /etc/rss-digest
 sudo cp config.example.toml /etc/rss-digest/carl_pro.toml   # edit it, then chown/chmod as above
-sudo cp deploy/rss-digest@.service deploy/rss-digest@.timer /etc/systemd/system/
+sudo cp deploy/rss-digest@.service deploy/rss-digest@.timer deploy/rss-digest-lint@.service deploy/rss-digest-lint@.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
@@ -55,7 +55,17 @@ sudo -u rss-digest flock /var/lib/rss-digest/carl_pro.lock /opt/rss-digest/.venv
 
 On first run the tool writes `_config/interests.md`, `_config/digest-prompt.md` and
 `_config/page-prompt.md` into the vault, only when missing. Edit them freely; they are never overwritten.
-Topic pages live in `Topics/`, digests in `Digest/`.
+Topic pages live in `Topics/`, digests in `Digest/`. Each topic page is an `entity` (a tool, project, company or
+person) or a `concept` (an idea or practice), and links related topic pages.
+
+Files the tool keeps for you:
+
+- `Topics/index.md`: every topic page with its description, grouped by kind. Regenerated after each update.
+- `log.md`: append-only, one line per page written (`## [date] ingest | Topic`), per digest and per maintenance pass.
+- `Maintenance/<date>.md` and `Overview.md`: written by `rss-digest --config ... lint`, a weekly maintenance pass
+  (`deploy/rss-digest-lint@.timer`). It lists pages nothing links to, stale pages and pages without a description,
+  and asks the writer model for contradictions between pages, merge/split candidates, missing topics and questions
+  to explore. `Overview.md` is its synthesis of the whole vault. It never edits topic pages; about $0.20 per run.
 
 If you edit an AI-written section of a topic page, the page is left untouched and listed in the digest
 under "Pages not updated". It stays that way; v1 has no automatic release. Your own "My notes" section is

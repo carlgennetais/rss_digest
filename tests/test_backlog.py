@@ -144,3 +144,12 @@ def test_import_regenerates_the_index(tmp_path, dav, state):
     setup(tmp_path, [item("a")], {"1": ["DuckDB"]}, out={"DuckDB": PAGE})
     run_import(dav, state, tmp_path, tmp_path / "state.db")
     assert "[DuckDB](<DuckDB.md>)" in dav.files["Topics/index.md"]
+
+
+def test_import_lists_planned_topics_and_keeps_links_to_later_batches(tmp_path, dav, state):
+    linked = dict(PAGE, summary="Often used with [dbt](<dbt.md>) and [Nope](<Nope.md>).")
+    setup(tmp_path, [item("a"), item("b")], {"1": ["DuckDB"], "2": ["dbt"]}, out={"DuckDB": linked})  # dbt: later batch
+    import_pages(tmp_path, dav, state, "")
+    assert (tmp_path / "topics.txt").read_text().splitlines() == ["dbt\tdbt.md", "DuckDB\tDuckDB.md"]
+    summary = parse_page(dav.files["Topics/DuckDB.md"]).summary
+    assert "[dbt](<dbt.md>)" in summary and "Nope.md" not in summary

@@ -1,0 +1,10 @@
+[Unit]
+Description=rss-digest weekly maintenance pass (%i)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=rss-digest
+# The lock keeps this run and a manual backlog of the same instance from overlapping.
+ExecStart=/usr/bin/flock /var/lib/rss-digest/%i.lock /opt/rss-digest/.venv/bin/rss-digest --config /etc/rss-digest/%i.toml lint

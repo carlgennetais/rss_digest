@@ -11,7 +11,7 @@ from pathlib import Path
 from .fetch import THIN, is_video
 from .models import Item
 from .textutil import safe_filename
-from .vault import ITEM_TEXT_CAP, mark_kept, write_topic_page
+from .vault import ITEM_TEXT_CAP, list_topics, mark_kept, write_topic_page
 
 log = logging.getLogger(__name__)
 
@@ -71,6 +71,12 @@ def import_pages(folder: Path, dav, state, page_prompt: str) -> dict[str, int]:
             pages.setdefault(stem, (t, []))[1].append(it)
             needs.setdefault(it.id, set()).add(stem)
             nums.setdefault(stem, []).append(n)
+    # every topic in the assignment, written or still to come, so pages can link across batches
+    planned = {f"{safe_filename(t)}.md": t for titles in assignment.values() if isinstance(titles, list)
+               for t in titles if isinstance(t, str) and t.strip()}
+    (folder / "topics.txt").write_text("".join(f"{t}\t{f}\n" for f, t in sorted(planned.items(), key=lambda x: x[1].casefold())),
+                                       encoding="utf-8")
+    targets = {t.filename: t.title for t in list_topics(dav)} | planned
     counts = dict.fromkeys(("written", "flagged", "failed", "missing", "invalid", "items_processed"), 0)
     written, todo = set(), []
     for stem, (title, items) in pages.items():
@@ -89,7 +95,7 @@ def import_pages(folder: Path, dav, state, page_prompt: str) -> dict[str, int]:
             counts["invalid"] += 1
             todo.append((title, stem))
             continue
-        result = write_topic_page(stem, title, items, dav, state, _Reply(obj), "agent", page_prompt)
+        result = write_topic_page(stem, title, items, dav, state, _Reply(obj), "agent", page_prompt, targets)
         counts[result] += 1
         if result == "written":
             written.add(stem)

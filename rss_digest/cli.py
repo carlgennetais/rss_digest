@@ -14,6 +14,7 @@ from .feed import update_feed
 from .fetch import CONSOLE, enrich
 from .freshrss import FreshRSS
 from .interests import filter_items, parse_interests
+from .lint import run_lint
 from .llm import LLM, BudgetExceeded
 from .state import State
 from .vault import append_log, list_topics, profile_text, select_new_kept, update_vault, write_index
@@ -124,7 +125,7 @@ def run_import(dav, state, folder: Path, state_path: Path) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="rss-digest")
     ap.add_argument("--config", required=True, type=Path)
-    ap.add_argument("command", choices=["run", "backlog", "backlog-export", "backlog-import"])
+    ap.add_argument("command", choices=["run", "backlog", "backlog-export", "backlog-import", "lint"])
     ap.add_argument("--dir", type=Path, default=Path("backlog"), help="backlog-export/-import folder")
     args = ap.parse_args(argv)
     if CONSOLE.is_terminal:  # interactive: rich log lines that coexist with the progress bar
@@ -145,6 +146,8 @@ def main(argv: list[str] | None = None) -> int:
             run_export(fresh, wb, state, args.dir)
         elif args.command == "backlog":
             run_backlog(conf, *clients)
+        elif args.command == "lint":
+            log.info("Maintenance report: %s", run_lint(dav, llm, conf.llm.writer_model, datetime.now(UTC).date()))
         else:
             run_import(dav, state, args.dir, conf.state_path)
     except Exception:

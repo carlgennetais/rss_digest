@@ -68,7 +68,8 @@ uv run rss-digest --config config.backlog.toml backlog-import
 ```
 
 `backlog/todo.txt` has one line per page still to write, biggest first, with tab-separated columns:
-title, item count, output file, item numbers.
+title, item count, output file, item numbers. `backlog/topics.txt` lists every planned topic and its
+file name, so pages can link to topics written in later batches.
 
 ## 5. Write pages, one batch at a time
 
@@ -85,8 +86,12 @@ You write topic pages for a personal knowledge base. Read backlog/page-prompt.md
 For each of your lines from backlog/todo.txt (columns: title, item count, output file, item numbers):
 read backlog/items/<n>.json for each item number (fields: title, url, feed, published, text, thin, video).
 Write backlog/out/<output file> containing only this JSON:
-{"description": "<one line, at most 20 words>", "summary": "<markdown, at most 250 words, no ## headings>",
+{"description": "<one line, at most 20 words>", "kind": "entity" or "concept",
+ "summary": "<markdown, at most 250 words, no ## headings>",
  "recent": "<markdown bullets, at most 5, newest first, each starting with the article's date>"}
+kind: "entity" for a tool, project, company or person; "concept" for an idea, practice or field.
+Where it helps, link related topics listed in backlog/topics.txt (columns: title, file) exactly as
+[Title](<File.md>). Never link a topic that is not in that file.
 Use only what the items say. An item marked thin has little text: use its title and don't guess its content.
 No images. Don't use web tools. Don't write any other file.
 ```
@@ -112,4 +117,5 @@ Before enabling `rss-digest@carl_pro.timer`, copy `backlog/state.db` to `/var/li
 (owner `rss-digest`, mode 600). It holds which items are done and the fingerprint of every page. Without
 it, the server treats every topic page as edited by you and never updates them.
 
-Then delete `backlog/` and `config.backlog.toml`.
+Then delete `backlog/` and `config.backlog.toml`, and run `rss-digest --config config.toml lint` once for
+a first maintenance report and `Overview.md`.
