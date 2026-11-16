@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from .fetch import THIN, is_video
+from .fetch import THIN, is_video, yt_transcript
 from .models import Item
 from .textutil import safe_filename
 from .vault import ITEM_TEXT_CAP, list_topics, mark_kept, write_topic_page
@@ -36,6 +36,36 @@ def export(items, out: Path) -> int:
                     f"{'thin' if thin else ''}\t{clean(it.title)}")
     (out / "titles.tsv").write_text("\n".join(rows) + "\n", encoding="utf-8")
     return len(items)
+
+
+def retry_videos(folder: Path, transcript=None) -> tuple[int, int]:
+    """Fetches transcripts for the videos in videos-retry.tsv into their item files, keeping item numbers.
+
+    Rewrites the list with the videos still failing; returns (improved, failed).
+    """
+    transcript = transcript or yt_transcript
+    path = folder / "videos-retry.tsv"
+    header, *rows = path.read_text(encoding="utf-8").splitlines()
+    left = []
+    for i, row in enumerate(rows, 1):
+        if i % 25 == 0:
+            log.info("Retrying videos: %d/%d (%d improved)", i, len(rows), i - 1 - len(left))
+        n, url = row.split("\t")[:2]
+        item_path = folder / "items" / f"{n}.json"
+        d = json.loads(item_path.read_text(encoding="utf-8"))
+        try:
+            text = transcript(url)
+        except Exception as e:
+            log.warning("transcript failed for %s: %s", url, e)
+            text = None
+        if text and len(text) > len(d["text"]):
+            d["text"] = text[:ITEM_TEXT_CAP]
+            d["thin"] = len(d["text"]) < THIN
+            item_path.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        else:
+            left.append(row)
+    path.write_text("".join(f"{r}\n" for r in [header, *left]), encoding="utf-8")
+    return len(rows) - len(left), len(left)
 
 
 class _Reply:

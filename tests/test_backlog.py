@@ -153,3 +153,15 @@ def test_import_lists_planned_topics_and_keeps_links_to_later_batches(tmp_path, 
     assert (tmp_path / "topics.txt").read_text().splitlines() == ["dbt\tdbt.md", "DuckDB\tDuckDB.md"]
     summary = parse_page(dav.files["Topics/DuckDB.md"]).summary
     assert "[dbt](<dbt.md>)" in summary and "Nope.md" not in summary
+
+
+def test_retry_videos_fills_transcripts_and_keeps_failures(tmp_path):
+    from rss_digest.backlog import retry_videos
+
+    export([item("A", url="https://youtu.be/a", text=""), item("B", url="https://youtu.be/b", text="")], tmp_path)
+    (tmp_path / "videos-retry.tsv").write_text("n\turl\ttitle\n1\thttps://youtu.be/a\tA\n2\thttps://youtu.be/b\tB\n")
+    got = retry_videos(tmp_path, transcript=lambda url: "spoken " * 300 if url.endswith("a") else None)
+    assert got == (1, 1)
+    a = json.loads((tmp_path / "items/1.json").read_text())
+    assert a["text"].startswith("spoken") and not a["thin"]
+    assert (tmp_path / "videos-retry.tsv").read_text() == "n\turl\ttitle\n2\thttps://youtu.be/b\tB\n"

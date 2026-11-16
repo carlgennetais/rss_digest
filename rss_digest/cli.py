@@ -125,8 +125,8 @@ def run_import(dav, state, folder: Path, state_path: Path) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="rss-digest")
     ap.add_argument("--config", required=True, type=Path)
-    ap.add_argument("command", choices=["run", "backlog", "backlog-export", "backlog-import", "lint"])
-    ap.add_argument("--dir", type=Path, default=Path("backlog"), help="backlog-export/-import folder")
+    ap.add_argument("command", choices=["run", "backlog", "backlog-export", "backlog-import", "backlog-retry-videos", "lint"])
+    ap.add_argument("--dir", type=Path, default=Path("backlog"), help="backlog folder")
     args = ap.parse_args(argv)
     if CONSOLE.is_terminal:  # interactive: rich log lines that coexist with the progress bar
         logging.basicConfig(level=logging.INFO, format="%(message)s",
@@ -146,6 +146,9 @@ def main(argv: list[str] | None = None) -> int:
             run_export(fresh, wb, state, args.dir)
         elif args.command == "backlog":
             run_backlog(conf, *clients)
+        elif args.command == "backlog-retry-videos":
+            improved, failed = backlog.retry_videos(args.dir)
+            log.info("Transcripts fetched: %d, still failing: %d (kept in %s)", improved, failed, args.dir / "videos-retry.tsv")
         elif args.command == "lint":
             log.info("Maintenance report: %s", run_lint(dav, llm, conf.llm.writer_model, datetime.now(UTC).date()))
         else:

@@ -43,6 +43,16 @@ This takes a while:
 
 It writes `backlog/items/<n>.json` and `backlog/titles.tsv`.
 
+**Videos YouTube refused (HTTP 429):** list them in `backlog/videos-retry.tsv` (columns n, url, title) and
+retry later, even after assigning topics, since item numbers don't change:
+
+```bash
+uv run rss-digest --config config.backlog.toml backlog-retry-videos
+```
+
+It fills the transcripts into the item files and keeps only the videos still failing in the list. Retry
+before the agents write those videos' topics; a page already imported won't pick up a later transcript.
+
 ## 3. Assign topics (once, one agent)
 
 In a Claude Code session in this repo, with the session on Sonnet (`/model sonnet`), say:
