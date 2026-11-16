@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -16,8 +17,18 @@ ASSIGN_PROMPT = (
     'number to a list of topic titles: an existing title verbatim, or "NEW: Title" for a new topic. '
     "Tags were set by the reader: treat them as a strong hint, and keep articles that share a tag on the same topic."
 )
-WRITER_FORMAT = ('\n\nReply with JSON only: {"description": "<one line>", "summary": "<markdown, no ## headings>", '
-                 '"recent": "<markdown bullets>"}')
+WRITER_FORMAT = ('\n\nReply with JSON only: {"description": "<one line>", "kind": "entity" or "concept", '
+                 '"summary": "<markdown, no ## headings>", "recent": "<markdown bullets>"}\n'
+                 'kind: "entity" for a tool, project, company or person; "concept" for an idea, practice or field.\n'
+                 "Where it helps the reader, link related topics from the list given, exactly as "
+                 "[Title](<File.md>). Never link a topic that is not in the list.")
+KINDS = {"entity", "concept"}
+_TOPIC_LINK = re.compile(r"\[([^\]]+)\]\(<?([^)>]+?\.md)>?\)")
+
+
+def keep_known_links(md: str, allowed: set[str]) -> str:
+    """Drops links to topic pages that don't exist (keeping their text), so pages never link to nothing."""
+    return _TOPIC_LINK.sub(lambda m: m.group(0) if "://" in m.group(2) or m.group(2) in allowed else m.group(1), md)
 ITEM_TEXT_CAP = 100_000  # characters per article (about an hour of transcript); 6 of ~1,900 kept items are longer
 
 
@@ -100,15 +111,20 @@ def _assign(batch, topics, llm, cheap_model) -> dict[str, list]:
     return wanted
 
 
-def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) -> None:
+def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt, link_targets=None) -> int:
+    """Rewrites a topic page with new items; returns how many new items it cites (0: nothing to do).
+    link_targets: {"File.md": "Title"} of the other topic pages the writer may link to."""
     path = f"{TOPICS_DIR}/{safe_filename(title)}.md"
     page = new_page(title) if text is None else parse_page(text)
     cited = {normalize_url(s["url"]) for s in page.front["sources"] if s.get("url")}
     items = [i for i in items if normalize_url(i.url) not in cited]
     if not items:  # already on the page: no writer call, no rewrite
-        return
+        return 0
+    links = {f: t for f, t in (link_targets or {}).items() if f != f"{safe_filename(title)}.md"}
     user = (f"Topic: {title}\n\n## Current summary\n{page.summary}\n\n## Current recent changes\n{page.recent}\n\n"
-            f"## My notes (read-only context, never rewrite)\n{page.my_notes_tail}\n\n## New articles\n"
+            f"## My notes (read-only context, never rewrite)\n{page.my_notes_tail}\n\n"
+            f"## Other topics you may link to\n" + "".join(f"- {t} → {f}\n" for f, t in sorted(links.items()))
+            + "\n## New articles\n"
             + "\n\n".join(f"Title: {i.title}\nURL: {i.url}\n{strip_md_images(i.text)[:ITEM_TEXT_CAP]}" for i in items))
     reply = llm.chat_json(writer_model, page_prompt + WRITER_FORMAT, user)
     if not (isinstance(reply, dict) and isinstance(reply.get("summary"), str)
@@ -116,8 +132,10 @@ def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) 
         raise LLMError("writer reply needs string summary and recent")
     if isinstance(reply.get("description"), str):
         page.front["description"] = reply["description"]
-    page.summary = strip_md_images(reply["summary"])
-    page.recent = strip_md_images(reply["recent"])
+    if reply.get("kind") in KINDS:
+        page.front["kind"] = reply["kind"]
+    page.summary = keep_known_links(strip_md_images(reply["summary"]), set(links))
+    page.recent = keep_known_links(strip_md_images(reply["recent"]), set(links))
     have = {s.get("url") for s in page.front["sources"]}
     for i in items:
         if i.url not in have:
@@ -128,9 +146,11 @@ def _write_page(title, text, items, dav, state, llm, writer_model, page_prompt) 
     out = render_page(page)
     dav.write(path, out)
     state.set_page_hash(safe_filename(title), ai_hash(out))
+    return len(items)
 
 
-def write_topic_page(stem: str, title: str, items: list, dav, state, llm, writer_model: str, page_prompt: str) -> str:
+def write_topic_page(stem: str, title: str, items: list, dav, state, llm, writer_model: str, page_prompt: str,
+                     link_targets: dict[str, str] | None = None) -> str:
     """Writes one topic page; returns "written", "flagged" (edited, unparsable or not ours) or "failed"."""
     path = f"{TOPICS_DIR}/{stem}.md"
     try:
@@ -149,7 +169,7 @@ def write_topic_page(stem: str, title: str, items: list, dav, state, llm, writer
             log.warning("page %s was edited or is not ours, skipping", path)
             return "flagged"
     try:
-        _write_page(title, text, items, dav, state, llm, writer_model, page_prompt)
+        _write_page(title, text, items, dav, state, llm, writer_model, page_prompt, link_targets)
     except (LLMError, httpx.HTTPStatusError) as e:
         log.warning("writing page %s failed, skipping: %s", title, e)
         return "failed"
@@ -183,8 +203,9 @@ def update_vault(items, dav, state, llm, cheap_model, writer_model, page_prompt,
                 pages.setdefault(stem, (t, []))[1].append(by_id[iid])
                 needs.setdefault(iid, set()).add(stem)
         done: set[str] = set()
+        targets = {t.filename: t.title for t in list_topics(dav)} | {f"{s}.md": t for s, (t, _) in pages.items()}
         for stem, (title, page_items) in pages.items():
-            result = write_topic_page(stem, title, page_items, dav, state, llm, writer_model, page_prompt)
+            result = write_topic_page(stem, title, page_items, dav, state, llm, writer_model, page_prompt, targets)
             if result == "flagged" and title not in flagged:
                 flagged.append(title)
             if result == "written":

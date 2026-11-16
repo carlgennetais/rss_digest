@@ -206,3 +206,21 @@ def test_writer_gets_full_article_text(dav, state):
     llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}])
     run([long], dav, state, llm)
     assert "w" * 5000 + "END" in llm.calls[1][3]
+
+
+def test_writer_links_known_topics_drops_unknown_and_sets_kind(dav, state):
+    run([item("x")], dav, state, FakeLLM(json_replies=[{"1": ["NEW: DuckDB"]}, W]))  # DuckDB.md now exists
+    llm = FakeLLM(json_replies=[{"1": ["NEW: dbt"]}, {
+        "description": "d", "kind": "entity", "recent": "- r",
+        "summary": "Often paired with [DuckDB](<DuckDB.md>), see [Ghost](<Ghost.md>) and [docs](https://docs.getdbt.com)."}])
+    run([item("y")], dav, state, llm)
+    assert "DuckDB.md" in llm.calls[1][3]  # the writer is told which topics exist
+    page = parse_page(dav.files["Topics/dbt.md"])
+    assert "[DuckDB](<DuckDB.md>)" in page.summary and "[docs](https://docs.getdbt.com)" in page.summary
+    assert "Ghost" in page.summary and "Ghost.md" not in page.summary  # unknown page: text kept, link dropped
+    assert page.front["kind"] == "entity"
+
+
+def test_kind_must_be_entity_or_concept(dav, state):
+    run([item("x")], dav, state, FakeLLM(json_replies=[{"1": ["NEW: T"]}, dict(W, kind="banana")]))
+    assert "kind" not in parse_page(dav.files["Topics/T.md"]).front
