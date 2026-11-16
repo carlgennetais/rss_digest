@@ -16,7 +16,7 @@ from .freshrss import FreshRSS
 from .interests import filter_items, parse_interests
 from .llm import LLM, BudgetExceeded
 from .state import State
-from .vault import list_topics, profile_text, select_new_kept, update_vault, write_index
+from .vault import append_log, list_topics, profile_text, select_new_kept, update_vault, write_index
 from .wallabag import Wallabag
 from .webdav import WebDAV
 
@@ -81,6 +81,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
     if notice:
         md += f"\n{notice}\n"
     dav.write(f"Digest/{now.date().isoformat()}.md", md)
+    append_log(dav, "digest", f"{len(kept_items)} articles, {muted} muted", day=now.date())
     state.set("last_digest_run", now.isoformat())
     try:  # the feed is a convenience copy: a failure here must not fail the run
         dav.write("Feed/digest.xml", update_feed(dav.read("Feed/digest.xml"), now.date(), md, now))

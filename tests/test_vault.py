@@ -10,6 +10,11 @@ from rss_digest.vault import TopicRef, list_topics, profile_text, select_new_kep
 W = {"description": "d", "summary": "s", "recent": "- r"}
 
 
+def pages(dav):
+    """Topic pages written; log.md and the index are bookkeeping."""
+    return [f for f in dav.files if f.startswith("Topics/") and f != "Topics/index.md"]
+
+
 def run(items, dav, state, llm):
     return update_vault(items, dav, state, llm, "c", "w", "")
 
@@ -86,21 +91,21 @@ def test_assignment_forms(dav, state):
     run([item("seed")], dav, state, FakeLLM(json_replies=[{"1": "NEW: Rust"}, W]))
     llm = FakeLLM(json_replies=[{"1": ["rust", "nEw: Go", "Third"], "2": [" ", ""], "9": ["Rust"]}, W, W])
     run([item("a"), item("b")], dav, state, llm)
-    assert sorted(dav.files) == ["Topics/Go.md", "Topics/Rust.md"]
+    assert sorted(pages(dav)) == ["Topics/Go.md", "Topics/Rust.md"]
     assert state.is_processed(item("a").id) and not state.is_processed(item("b").id)
 
 
 def test_titles_with_same_file_are_one_page(dav, state):
     llm = FakeLLM(json_replies=[{"1": ["NEW: A/B"], "2": ["NEW: A-B"]}, W])
     run([item("x"), item("y")], dav, state, llm)
-    assert len(llm.calls) == 2 and list(dav.files) == ["Topics/A-B.md"]
+    assert len(llm.calls) == 2 and pages(dav) == ["Topics/A-B.md"]
     assert state.is_processed(item("x").id) and state.is_processed(item("y").id)
 
 
 def test_item_needs_all_pages(dav, state):
     llm = FakeLLM(json_replies=[{"1": ["NEW: A", "NEW: B"]}, W, {"summary": 3, "recent": ""}])
     run([item("x")], dav, state, llm)
-    assert list(dav.files) == ["Topics/A.md"] and not state.is_processed(item("x").id)
+    assert pages(dav) == ["Topics/A.md"] and not state.is_processed(item("x").id)
 
 
 def test_list_topics_and_profile(dav):
@@ -183,7 +188,7 @@ def test_dav_error_on_one_page_skips_only_that_page(state, op):
     dav = Locked()
     llm = FakeLLM(json_replies=[{"1": ["NEW: A"], "2": ["NEW: B"]}, W, W])
     assert run([item("x"), item("y")], dav, state, llm) == []
-    assert list(dav.files) == ["Topics/B.md"]
+    assert pages(dav) == ["Topics/B.md"]
     assert not state.is_processed(item("x").id) and state.is_processed(item("y").id)
 
 
@@ -240,3 +245,15 @@ def test_index_groups_by_kind_and_skips_pages_not_ours(dav, state):
     assert "Mine" not in idx
     write_index(dav)
     assert "index.md" not in dav.files["Topics/index.md"]  # never lists itself
+
+
+def test_log_is_append_only_with_one_line_per_written_page(dav, state):
+    from rss_digest.vault import append_log
+
+    dav.files["log.md"] = "# Log\n\nmy own line\n"
+    run([item("x"), item("y")], dav, state, FakeLLM(json_replies=[{"1": ["NEW: DuckDB"], "2": ["NEW: DuckDB"]}, W]))
+    append_log(dav, "digest", "12 articles")
+    lines = dav.files["log.md"].splitlines()
+    assert lines[:3] == ["# Log", "", "my own line"]
+    assert lines[3].endswith("] ingest | DuckDB (2 new sources)") and lines[3].startswith("## [")
+    assert lines[4].endswith("] digest | 12 articles")

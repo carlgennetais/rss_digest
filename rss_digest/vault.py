@@ -58,6 +58,12 @@ def list_topics(dav) -> list[TopicRef]:
     return topics
 
 
+def append_log(dav, kind: str, text: str, day=None) -> None:
+    """Appends "## [date] kind | text" to log.md, the vault's append-only record of what changed."""
+    old = dav.read("log.md") or "# Log\n\n"
+    day = day or datetime.now(timezone.utc).date()
+    dav.write("log.md", (old if old.endswith("\n") else old + "\n") + f"## [{day.isoformat()}] {kind} | {text}\n")
+
 def write_index(dav) -> None:
     """Regenerates Topics/index.md: every topic page with its description, grouped by kind."""
     groups = {"entity": "Entities", "concept": "Concepts", "": "Other"}
@@ -186,10 +192,12 @@ def write_topic_page(stem: str, title: str, items: list, dav, state, llm, writer
             log.warning("page %s was edited or is not ours, skipping", path)
             return "flagged"
     try:
-        _write_page(title, text, items, dav, state, llm, writer_model, page_prompt, link_targets)
+        n = _write_page(title, text, items, dav, state, llm, writer_model, page_prompt, link_targets)
     except (LLMError, httpx.HTTPStatusError) as e:
         log.warning("writing page %s failed, skipping: %s", title, e)
         return "failed"
+    if n:
+        append_log(dav, "ingest", f"{title} ({n} new source{'s' * (n != 1)})")
     return "written"
 
 

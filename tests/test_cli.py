@@ -193,3 +193,8 @@ def test_daily_regenerates_the_index_when_pages_change(env):
     env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}])
     daily(env)
     assert "[T](<T.md>)" in env.dav.files["Topics/index.md"]
+
+
+def test_daily_logs_the_digest(env):
+    daily(env)
+    assert f"## [{NOW.date()}] digest | 0 articles" in env.dav.files["log.md"]
