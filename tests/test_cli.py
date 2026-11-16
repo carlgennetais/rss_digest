@@ -186,3 +186,10 @@ def test_daily_uses_the_transcript_of_a_saved_video(env, monkeypatch):
     env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}])
     daily(env)
     assert "The talk transcript." in env.llm.calls[1][3]
+
+
+def test_daily_regenerates_the_index_when_pages_change(env):
+    env.wb = FakeWallabag([item("talk", text="t" * 2000)])
+    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}])
+    daily(env)
+    assert "[T](<T.md>)" in env.dav.files["Topics/index.md"]

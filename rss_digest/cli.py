@@ -16,7 +16,7 @@ from .freshrss import FreshRSS
 from .interests import filter_items, parse_interests
 from .llm import LLM, BudgetExceeded
 from .state import State
-from .vault import list_topics, profile_text, select_new_kept, update_vault
+from .vault import list_topics, profile_text, select_new_kept, update_vault, write_index
 from .wallabag import Wallabag
 from .webdav import WebDAV
 
@@ -61,6 +61,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
         kept = enrich(select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state))
         if kept:
             flagged = update_vault(kept, dav, state, llm, conf.llm.cheap_model, conf.llm.writer_model, page_prompt)
+            write_index(dav)
     except BudgetExceeded:
         notice, vault_error = "Vault update paused: token budget reached.", True
     except Exception as e:
@@ -97,8 +98,10 @@ def run_backlog(conf, fresh, wb, dav, llm, state) -> None:
     try:
         update_vault(items, dav, state, llm, conf.llm.cheap_model, conf.llm.writer_model, page_prompt)
     except BudgetExceeded:
+        write_index(dav)
         log.info("Token budget reached; re-run to continue.")
         return
+    write_index(dav)
     log.info("Backlog done.")
 
 
@@ -110,6 +113,7 @@ def run_export(fresh, wb, state, out: Path) -> int:
 
 def run_import(dav, state, folder: Path, state_path: Path) -> dict[str, int]:
     counts = backlog.import_pages(folder, dav, state, _config_text(dav, "page-prompt.md"))
+    write_index(dav)
     print(", ".join(f"{k}: {v}" for k, v in counts.items()))
     print(f"Still to write: {folder / 'todo.txt'}")
     if counts["written"]:

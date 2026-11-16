@@ -136,3 +136,11 @@ def test_yt_transcript_uses_subtitles_saved_before_an_error(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/yt-dlp")
     monkeypatch.setattr(subprocess, "run", fake_run)
     assert yt_transcript("https://youtu.be/abc") == "Hello talk"
+
+
+def test_import_regenerates_the_index(tmp_path, dav, state):
+    from rss_digest.cli import run_import
+
+    setup(tmp_path, [item("a")], {"1": ["DuckDB"]}, out={"DuckDB": PAGE})
+    run_import(dav, state, tmp_path, tmp_path / "state.db")
+    assert "[DuckDB](<DuckDB.md>)" in dav.files["Topics/index.md"]

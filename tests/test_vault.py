@@ -224,3 +224,19 @@ def test_writer_links_known_topics_drops_unknown_and_sets_kind(dav, state):
 def test_kind_must_be_entity_or_concept(dav, state):
     run([item("x")], dav, state, FakeLLM(json_replies=[{"1": ["NEW: T"]}, dict(W, kind="banana")]))
     assert "kind" not in parse_page(dav.files["Topics/T.md"]).front
+
+
+def test_index_groups_by_kind_and_skips_pages_not_ours(dav, state):
+    from rss_digest.vault import write_index
+
+    run([item("x"), item("y")], dav, state, FakeLLM(json_replies=[
+        {"1": ["NEW: DuckDB"], "2": ["NEW: Semantic layers"]},
+        dict(W, kind="entity", description="In-process analytics database"), dict(W, kind="concept")]))
+    dav.files["Topics/Mine.md"] = "# my own page"
+    write_index(dav)
+    idx = dav.files["Topics/index.md"]
+    assert idx.index("## Entities") < idx.index("[DuckDB](<DuckDB.md>) — In-process analytics database · 1 source")
+    assert idx.index("## Concepts") < idx.index("[Semantic layers](<Semantic layers.md>)")
+    assert "Mine" not in idx
+    write_index(dav)
+    assert "index.md" not in dav.files["Topics/index.md"]  # never lists itself
