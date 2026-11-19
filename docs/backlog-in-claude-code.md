@@ -58,12 +58,16 @@ before the agents write those videos' topics; a page already imported won't pick
 In a Claude Code session in this repo, with the session on Sonnet (`/model sonnet`), say:
 
 ```
-Read backlog/titles.tsv (columns: n, source, date, feed, tags, thin, title). Group these saved articles
-into 80 to 150 topics, each named the way a person would title a note in a knowledge base (e.g. "DuckDB",
-"Semantic layers", "Neovim"). Use the tags column as a strong hint. Give every article 1 or 2 topics;
-an article that fits no lasting topic goes to "Misc". Write backlog/assignment.json as
-{"<n>": ["Topic", ...]} using only n values from the file, and backlog/topics.md listing each topic
-with its article count, biggest first. Do not read the items folder and do not write anything else.
+Read backlog/titles.tsv (columns: n, source, date, feed, tags, thin, title) in full and read every title
+yourself; do not classify with keyword rules or a script. Group these saved articles into topics, each named
+the way a person would title a note in a knowledge base: specific tools, projects, techniques or ideas
+(e.g. "DuckDB", "Semantic layers", "RAG"), not broad fields like "Machine learning" or "Python".
+Use the tags column as a strong hint. Give every article 1 or 2 topics; an article that fits no lasting
+topic goes to "Misc". At most 40 articles and about 120k tokens of article text per topic (one agent reads
+a whole topic at once; text size is len(text)/4 in backlog/items/<n>.json): split bigger subjects into
+narrower topics, and use "Misc 2" if Misc gets too big. Write backlog/assignment.json as
+{"<n>": ["Topic", ...]} using every n from the file, and backlog/topics.md listing each topic with its
+article count, biggest first. Do not write anything else.
 ```
 
 ## 4. Review the topics
@@ -88,16 +92,22 @@ file name, so pages can link to topics written in later batches.
 For each batch, say this in the session, changing the number of topics and agents:
 
 ```
-Take the first 8 lines of backlog/todo.txt and split them across 4 background agents on the Sonnet
-model, 2 topics each, giving each agent its lines and the prompt below.
+Take the first 8 lines of backlog/todo.txt and give them to 8 background agents on the Sonnet
+model, one topic each (a topic can hold up to about 120k tokens of text), giving each agent its lines and the prompt below.
 
 Agent prompt:
 You write topic pages for a personal knowledge base. Read backlog/page-prompt.md once; it gives the rules.
 For each of your lines from backlog/todo.txt (columns: title, item count, output file, item numbers):
 read backlog/items/<n>.json for each item number (fields: title, url, feed, published, text, thin, video).
+Each item file is a single long JSON line that the Read tool cuts short, and long Bash output is cut too,
+so first convert each item to a wrapped text file and read those files with the Read tool, in parts when long:
+`python3 -c "import json,sys,textwrap; d=json.load(open(sys.argv[1])); open(sys.argv[2],'w').write(f\"{d['title']}\n{d['published']} {d['url']}\n\n\"+textwrap.fill(d['text'],200))" backlog/items/<n>.json /tmp/rss-items/<n>.txt`
+(create /tmp/rss-items first).
+Read every item's text in full, to the end; never skim or read only the beginning. Use the details
+(numbers, tools, arguments, conclusions) in the summary.
 Write backlog/out/<output file> containing only this JSON:
 {"description": "<one line, at most 20 words>", "kind": "entity" or "concept",
- "summary": "<markdown, at most 250 words, no ## headings>",
+ "summary": "<markdown, at most 250 words, up to 500 when the topic has more than 20 items, no ## headings>",
  "recent": "<markdown bullets, at most 5, newest first, each starting with the article's date>"}
 kind: "entity" for a tool, project, company or person; "concept" for an idea, practice or field.
 Where it helps, link related topics listed in backlog/topics.txt (columns: title, file) exactly as

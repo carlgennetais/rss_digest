@@ -42,7 +42,7 @@ def _config_text(dav, name: str) -> str:
     return _default(name) if text is None else text
 
 
-def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
+def run_daily(conf, fresh, wb, dav, llm, state, now: datetime, vault: bool = True) -> None:
     seed_config(dav)
     interests = parse_interests(_config_text(dav, "interests.md"))
     digest_prompt = _config_text(dav, "digest-prompt.md")
@@ -59,7 +59,8 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
     # the vault step keeps at least half the budget, even when it is below the reserve
     limit, llm.limit = llm.limit, llm.limit - min(DIGEST_RESERVE, llm.limit // 2)
     try:
-        kept = enrich(select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state))
+        if vault:
+            kept = enrich(select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state))
         if kept:
             flagged = update_vault(kept, dav, state, llm, conf.llm.cheap_model, conf.llm.writer_model, page_prompt)
             write_index(dav)
@@ -71,7 +72,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime) -> None:
     finally:
         llm.limit = limit
     # Wallabag is fetched since last_kept_run, so only advance it once every Wallabag item is on its pages.
-    if vault_error is None and all(state.is_processed(i.id) for i in kept if i.source == "wallabag"):
+    if vault and vault_error is None and all(state.is_processed(i.id) for i in kept if i.source == "wallabag"):
         state.set("last_kept_run", now.isoformat())
 
     items = fresh.reading_list(since=since("last_digest_run"))
@@ -125,7 +126,7 @@ def run_import(dav, state, folder: Path, state_path: Path) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="rss-digest")
     ap.add_argument("--config", required=True, type=Path)
-    ap.add_argument("command", choices=["run", "backlog", "backlog-export", "backlog-import", "backlog-retry-videos", "lint"])
+    ap.add_argument("command", choices=["run", "digest", "backlog", "backlog-export", "backlog-import", "backlog-retry-videos", "lint"])
     ap.add_argument("--dir", type=Path, default=Path("backlog"), help="backlog folder")
     args = ap.parse_args(argv)
     if CONSOLE.is_terminal:  # interactive: rich log lines that coexist with the progress bar
@@ -140,8 +141,8 @@ def main(argv: list[str] | None = None) -> int:
         clients = (FreshRSS(conf.freshrss), Wallabag(conf.wallabag), WebDAV(conf.nextcloud),
                    LLM(conf.llm), State(conf.state_path))
         fresh, wb, dav, llm, state = clients
-        if args.command == "run":
-            run_daily(conf, *clients, now=datetime.now(UTC))
+        if args.command in ("run", "digest"):  # digest: skip the wiki step, leave stars and Wallabag untouched
+            run_daily(conf, *clients, now=datetime.now(UTC), vault=args.command == "run")
         elif args.command == "backlog-export":
             run_export(fresh, wb, state, args.dir)
         elif args.command == "backlog":

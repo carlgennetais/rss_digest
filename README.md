@@ -42,6 +42,19 @@ The timer fires daily at 06:00 (`Persistent=true` catches up after downtime). Ch
 `journalctl -u rss-digest@carl_pro`. The first run digests only the last 24 hours.
 A run that fails halfway does not advance its timestamps, so the next run retries.
 
+To write only the digest and leave the wiki alone (while a backlog import is in progress, or for
+good), run the `digest` command instead of `run`:
+
+```
+sudo systemctl edit rss-digest@carl_pro.service
+# [Service]
+# ExecStart=
+# ExecStart=/usr/bin/flock /var/lib/rss-digest/%i.lock /opt/rss-digest/.venv/bin/rss-digest --config /etc/rss-digest/%i.toml digest
+```
+
+It doesn't touch stars or Wallabag. When you switch back to `run`, Wallabag items saved more than
+24 hours earlier are skipped unless `last_kept_run` in the state database is set to when the wiki stopped.
+
 ## Backlog
 
 To file everything already starred or saved, run once by hand. It stops cleanly when the

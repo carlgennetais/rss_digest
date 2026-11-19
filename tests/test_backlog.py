@@ -160,8 +160,16 @@ def test_retry_videos_fills_transcripts_and_keeps_failures(tmp_path):
 
     export([item("A", url="https://youtu.be/a", text=""), item("B", url="https://youtu.be/b", text="")], tmp_path)
     (tmp_path / "videos-retry.tsv").write_text("n\turl\ttitle\n1\thttps://youtu.be/a\tA\n2\thttps://youtu.be/b\tB\n")
-    got = retry_videos(tmp_path, transcript=lambda url: "spoken " * 300 if url.endswith("a") else None)
+    got = retry_videos(tmp_path, transcript=lambda url: "spoken " * 300 if url.endswith("a") else None, pause=0)
     assert got == (1, 1)
     a = json.loads((tmp_path / "items/1.json").read_text())
     assert a["text"].startswith("spoken") and not a["thin"]
     assert (tmp_path / "videos-retry.tsv").read_text() == "n\turl\ttitle\n2\thttps://youtu.be/b\tB\n"
+
+
+def test_retry_videos_drops_items_filled_by_a_stopped_run(tmp_path):
+    from rss_digest.backlog import retry_videos
+
+    export([item("A", url="https://youtu.be/a", text="z" * 2000)], tmp_path)
+    (tmp_path / "videos-retry.tsv").write_text("n\turl\ttitle\n1\thttps://youtu.be/a\tA\n")
+    assert retry_videos(tmp_path, transcript=lambda url: 1 / 0, pause=0) == (1, 0)

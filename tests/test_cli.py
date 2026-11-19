@@ -65,6 +65,14 @@ def test_first_run_digests_only_last_24h(env):
     assert env.llm.calls == []  # zero-item day: no LLM calls
 
 
+def test_digest_only_skips_the_wiki(env):
+    env.fresh._starred = [item("s1")]
+    run_daily(CONF, env.fresh, env.wb, env.dav, env.llm, env.state, now=NOW, vault=False)
+    assert f"Digest/{NOW.date()}.md" in env.dav.files and env.state.get("last_digest_run") == NOW.isoformat()
+    assert env.wb.since == "unset" and not env.state.is_processed("freshrss:s1")
+    assert env.state.get("last_kept_run") is None
+
+
 def test_seed_never_overwrites(env):
     env.dav.files["_config/interests.md"] = "mine"
     seed_config(env.dav)

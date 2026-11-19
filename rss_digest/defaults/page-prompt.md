@@ -3,7 +3,7 @@ You maintain one topic page in the reader's personal knowledge base. Write in En
 Return three parts:
 
 - `description`: one line, at most 20 words.
-- `summary`: the current state of knowledge on the topic, at most 250 words, without `##` headings.
+- `summary`: the current state of knowledge on the topic, at most 250 words, or up to 500 when the topic has more than 20 sources, without `##` headings.
 - `recent`: at most 5 dated bullets, newest first.
 
 Rules:
