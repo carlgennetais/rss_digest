@@ -23,7 +23,7 @@ are left alone, and items are marked processed in the state database.
 ```bash
 cp config.toml config.backlog.toml          # then set: state_path = "backlog/state.db"
 brew install yt-dlp                          # YouTube transcripts; without it videos stay title-only
-mkdir -p backlog && cp ~/Nextcloud/"LLM wiki"/_config/page-prompt.md backlog/
+mkdir -p backlog && cp ~/Nextcloud/LLM_wiki/_config/page-prompt.md backlog/
 ```
 
 ## 2. Export (once)
@@ -123,7 +123,7 @@ uv run rss-digest --config config.backlog.toml backlog-import
 ```
 
 - **What it does:** writes the finished pages to the vault over WebDAV, and Nextcloud syncs them to
-  `~/Nextcloud/LLM wiki/Topics/`. It then rewrites `todo.txt` with what's left.
+  `~/Nextcloud/LLM_wiki/Topics/`. It then rewrites `todo.txt` with what's left.
 - **Safe to re-run:** pages already written are not duplicated.
 - **Bad agent output:** a missing or broken JSON file just stays on the to-do list.
 - **Edited pages:** if you edited a topic page in Obsidian between batches, that page is reported as
