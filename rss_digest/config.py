@@ -38,6 +38,7 @@ class LLMConf:
     cheap_model: str
     writer_model: str
     max_tokens_per_run: int = 200000
+    wiki_api_key: str = ""  # optional: a second key so the provider reports wiki and digest usage apart
 
 
 @dataclass

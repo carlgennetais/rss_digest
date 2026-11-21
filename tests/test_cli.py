@@ -158,6 +158,16 @@ def test_vault_step_leaves_reserve_for_digest(env):
     assert env.llm.limits == [170_000, 170_000, 200_000, 200_000] and env.llm.limit == 200_000
 
 
+def test_wiki_key_is_used_for_the_vault_step_only(env):
+    env.fresh._starred = [item("Starred one")]
+    env.fresh.reading = [item("news")]
+    env.llm = FakeLLM(json_replies=[{"1": ["NEW: T"]}, {"description": "d", "summary": "s", "recent": ""}, {"1": 5}],
+                      text_replies=["summary body"])
+    conf = replace(CONF, llm=replace(CONF.llm, wiki_api_key="wiki"))
+    run_daily(conf, env.fresh, env.wb, env.dav, env.llm, env.state, now=NOW)
+    assert env.llm.keys == ["wiki", "wiki", "k", "k"] and env.llm.api_key == "k"
+
+
 def test_small_budget_still_gives_vault_a_share(env):
     env.fresh._starred = [item("Starred one")]
     env.fresh.reading = [item("news")]

@@ -28,6 +28,7 @@ class LLM:
         self.tokens_used = 0
         self.cost = 0.0  # USD, when the provider reports it (OpenRouter does)
         self.limit = conf.max_tokens_per_run
+        self.api_key = conf.api_key  # run_daily swaps in the wiki key for the vault step
 
     def chat(self, model: str, system: str, user: str) -> str:
         if self.tokens_used >= self.limit:
@@ -36,7 +37,7 @@ class LLM:
             for attempt in range(2):
                 r = self.client.post(
                     f"{self.base}/chat/completions",
-                    headers={"Authorization": f"Bearer {self.conf.api_key}"},
+                    headers={"Authorization": f"Bearer {self.api_key}"},
                     json={
                         "model": model,
                         "messages": [

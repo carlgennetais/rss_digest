@@ -36,6 +36,8 @@ class FakeLLM:
         self.tokens_used = 0
         self.tokens_per_call = tokens_per_call
         self.limit = 200000
+        self.api_key = "k"
+        self.keys = []
 
     def _record(self, method, model, system, user):
         if self.raise_after is not None and len(self.calls) >= self.raise_after:
@@ -44,6 +46,7 @@ class FakeLLM:
             raise BudgetExceeded("fake limit")
         self.tokens_used += self.tokens_per_call
         self.calls.append((method, model, system, user))
+        self.keys.append(self.api_key)
 
     def chat_json(self, model, system, user):
         self._record("chat_json", model, system, user)

@@ -58,6 +58,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime, vault: bool = Tru
     kept = []
     # the vault step keeps at least half the budget, even when it is below the reserve
     limit, llm.limit = llm.limit, llm.limit - min(DIGEST_RESERVE, llm.limit // 2)
+    digest_key, llm.api_key = llm.api_key, conf.llm.wiki_api_key or llm.api_key
     try:
         if vault:
             kept = enrich(select_new_kept(fresh.starred() + wb.entries(since("last_kept_run")), state))
@@ -70,7 +71,7 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime, vault: bool = Tru
         log.exception("vault update failed")
         notice, vault_error = "Vault update failed (see logs); will retry next run.", e
     finally:
-        llm.limit = limit
+        llm.limit, llm.api_key = limit, digest_key
     # Wallabag is fetched since last_kept_run, so only advance it once every Wallabag item is on its pages.
     if vault and vault_error is None and all(state.is_processed(i.id) for i in kept if i.source == "wallabag"):
         state.set("last_kept_run", now.isoformat())
@@ -141,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         clients = (FreshRSS(conf.freshrss), Wallabag(conf.wallabag), WebDAV(conf.nextcloud),
                    LLM(conf.llm), State(conf.state_path))
         fresh, wb, dav, llm, state = clients
+        if args.command in ("backlog", "lint"):  # wiki-only commands
+            llm.api_key = conf.llm.wiki_api_key or llm.api_key
         if args.command in ("run", "digest"):  # digest: skip the wiki step, leave stars and Wallabag untouched
             run_daily(conf, *clients, now=datetime.now(UTC), vault=args.command == "run")
         elif args.command == "backlog-export":
