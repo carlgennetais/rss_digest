@@ -2,7 +2,7 @@
 Description=rss-digest daily timer (%i)
 
 [Timer]
-OnCalendar=*-*-* 06:00
+OnCalendar=*-*-* 18:00
 Persistent=true
 
 [Install]

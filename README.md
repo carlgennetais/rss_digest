@@ -38,7 +38,7 @@ Credentials to create, then put in the config:
 sudo systemctl enable --now rss-digest@carl_pro.timer
 ```
 
-The timer fires daily at 06:00 (`Persistent=true` catches up after downtime). Check with
+The timer fires daily at 18:00 (`Persistent=true` catches up after downtime). Check with
 `journalctl -u rss-digest@carl_pro`. The first run digests only the last 24 hours.
 A run that fails halfway does not advance its timestamps, so the next run retries.
 
