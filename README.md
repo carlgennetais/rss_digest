@@ -4,6 +4,21 @@ Once a day it reads FreshRSS, writes a digest note into an Obsidian vault on Nex
 FreshRSS items and Wallabag entries into LLM-maintained topic pages. The tool is stateless apart from one
 SQLite file per instance.
 
+## Daily use
+
+1. **Subscribe** to feeds in FreshRSS as usual. Everything new since the last run is a digest candidate.
+2. **Read the digest** at 18:00: `Digest/<date>.md` in Obsidian, or the [digest feed](#digest-feed) in a reader.
+   The top articles are summarised under topic headings, followed by "Also notable" links and a muted count.
+3. **Keep what matters**: star it in FreshRSS, or save it to Wallabag (tags help it land on the right page).
+   The next run files it into a topic page in `Topics/`, and it won't reappear in later digests.
+4. **Steer the ranking** in `_config/interests.md` with `follow:` and `mute:` lines (`mute: feed:Name` drops a
+   whole feed). Your topic pages also count as your profile, so what you keep shapes what is ranked first.
+   `_config/digest-prompt.md` and `_config/page-prompt.md` change how the digest and pages are written.
+5. **Add your own notes** under `## My notes` on any topic page; they are always kept. Don't edit the AI
+   sections unless you want the tool to stop updating that page (see [Vault](#vault)).
+6. **Ask questions** across the vault from Obsidian (see [Obsidian setup](#obsidian-setup)), and skim
+   `Maintenance/<date>.md` on Mondays for gaps and merge suggestions.
+
 ## Instances
 
 Run one instance per context (`carl_pro`, `carl`). Each has its own config file
