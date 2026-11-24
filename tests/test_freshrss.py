@@ -47,6 +47,14 @@ def test_reading_list_paginates_and_maps():
     assert rec.requests[2].url.params["c"] == "c1"
 
 
+def test_reading_list_drops_entries_crawled_before_since():
+    since = datetime(2026, 11, 13, tzinfo=UTC)
+    ms = int(since.timestamp() * 1000)
+    rec = Recorder(lambda r: httpx.Response(200, text="SID=x\nLSID=y\nAuth=TOKEN\n") if r.url.path.endswith("/ClientLogin")
+                   else httpx.Response(200, json={"items": [entry(1, crawlTimeMsec=str(ms - 1)), entry(2, crawlTimeMsec=str(ms)), entry(3)]}))
+    assert [i.title for i in FreshRSS(conf, client=rec.client).reading_list(since=since)] == ["T2", "T3"]
+
+
 def test_starred_falls_back_to_alternate_and_skips_ot():
     e = entry(1)
     del e["canonical"]

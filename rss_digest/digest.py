@@ -1,4 +1,5 @@
 import logging
+import random
 from datetime import date
 
 from rss_digest.interests import rank
@@ -13,7 +14,7 @@ def _line(it) -> str:
 
 
 def build_digest(day: date, items, interests, profile, llm, cheap_model, writer_model,
-                 digest_prompt, top_n, also_notable, flagged_pages, *, muted: int = 0) -> str:
+                 digest_prompt, top_n, also_notable, flagged_pages, *, stats: str = "", explore: int = 0) -> str:
     parts = [f"# Digest {day.isoformat()}"]
     if not items:
         parts.append("No new articles today.")
@@ -36,7 +37,11 @@ def build_digest(day: date, items, interests, profile, llm, cheap_model, writer_
         parts.append(body)
         if rest:
             parts.append("## Also notable\n" + "\n".join(_line(it) for it in rest))
-    parts.append(f"Muted: {muted} articles.")
+        pool = [it for it, _ in ranked[top_n + also_notable :]]
+        if explore and pool:
+            parts.append("## Outside your usual\n" + "\n".join(_line(it) for it in random.sample(pool, min(explore, len(pool)))))
+    if stats:
+        parts.append(stats)
     if flagged_pages:
         parts.append("## Pages not updated (you edited them)\n" + "\n".join(f"- [[{p}]]" for p in flagged_pages))
     return "\n\n".join(parts) + "\n"

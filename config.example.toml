@@ -29,8 +29,9 @@ cheap_model = "gpt-4.1-mini"           # ranking and topic assignment
 writer_model = "gpt-4.1"               # summaries and topic pages
 max_tokens_per_run = 200000            # optional; the run stops cleanly when reached
 # wiki_api_key = "..."                 # optional: a second key for topic pages, backlog and lint, so
-                                       # OpenRouter shows wiki and digest usage apart (Activity, filter by key)
+# OpenRouter shows wiki and digest usage apart (Activity, filter by key)
 
 [digest] # optional section
-top_n = 15        # articles summarised
+top_n = 20        # articles summarised
 also_notable = 10 # titles listed under "Also notable"
+explore = 5       # random titles from below the cut-off, under "Outside your usual"

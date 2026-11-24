@@ -41,7 +41,9 @@ class FreshRSS:
             )
             r.raise_for_status()
             data = r.json()
-            items += [_to_item(e) for e in data.get("items", [])]
+            # FreshRSS's ot also returns old entries it re-saw (vote counts, regenerated blogs); keep only new crawls
+            items += [_to_item(e) for e in data.get("items", [])
+                      if since is None or int(e.get("crawlTimeMsec", 1e15)) >= since.timestamp() * 1000]
             if not data.get("continuation"):
                 return items
             params["c"] = data["continuation"]

@@ -17,12 +17,14 @@ from .interests import filter_items, parse_interests
 from .lint import run_lint
 from .llm import LLM, BudgetExceeded
 from .state import State
+from .textutil import normalize_url
 from .vault import append_log, list_topics, profile_text, select_new_kept, update_vault, write_index
 from .wallabag import Wallabag
 from .webdav import WebDAV
 
 log = logging.getLogger(__name__)
 DIGEST_RESERVE = 30_000  # tokens the vault step leaves for the digest
+MAX_AGE = timedelta(days=7)  # feeds that republish their archive must not resurface old issues
 
 CONFIG_FILES = ("interests.md", "digest-prompt.md", "page-prompt.md")
 
@@ -76,15 +78,23 @@ def run_daily(conf, fresh, wb, dav, llm, state, now: datetime, vault: bool = Tru
     if vault and vault_error is None and all(state.is_processed(i.id) for i in kept if i.source == "wallabag"):
         state.set("last_kept_run", now.isoformat())
 
-    items = fresh.reading_list(since=since("last_digest_run"))
+    fetched = fresh.reading_list(since=since("last_digest_run"))
+    items = [it for it in fetched if it.published >= now - MAX_AGE]
     kept_items, muted = filter_items(items, interests, state)
+    n, top_n = len(kept_items), conf.digest.top_n
+    stats = (f"Fetched {len(fetched)} · too old {len(fetched) - len(items)} · already seen {len(items) - n - muted}"
+             f" · muted {muted} · ranked {n} → shown {min(n, top_n)} + {min(max(n - top_n, 0), conf.digest.also_notable)}"
+             f" + {min(max(n - top_n - conf.digest.also_notable, 0), conf.digest.explore)} explore")
     md = build_digest(now.date(), kept_items, interests, profile_text(list_topics(dav)), llm,
                       conf.llm.cheap_model, conf.llm.writer_model, digest_prompt,
-                      conf.digest.top_n, conf.digest.also_notable, flagged, muted=muted)
+                      conf.digest.top_n, conf.digest.also_notable, flagged, stats=stats, explore=conf.digest.explore)
     if notice:
         md += f"\n{notice}\n"
     dav.write(f"Digest/{now.date().isoformat()}.md", md)
-    append_log(dav, "digest", f"{len(kept_items)} articles, {muted} muted", day=now.date())
+    for it in kept_items:  # "d:", not "u:": a digested article can still be starred into the vault later
+        if it.url.strip():
+            state.add_key("d:" + normalize_url(it.url))
+    append_log(dav, "digest", stats, day=now.date())
     state.set("last_digest_run", now.isoformat())
     try:  # the feed is a convenience copy: a failure here must not fail the run
         dav.write("Feed/digest.xml", update_feed(dav.read("Feed/digest.xml"), now.date(), md, now))

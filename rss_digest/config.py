@@ -45,6 +45,7 @@ class LLMConf:
 class DigestConf:
     top_n: int = 15
     also_notable: int = 10
+    explore: int = 5  # random titles from below the cut-off, against the ranking's own bubble
 
 
 @dataclass

@@ -8,15 +8,15 @@ D = date(2026, 11, 14)
 
 def test_empty_day_makes_no_llm_calls(interests):
     llm = FakeLLM()
-    md = build_digest(D, [], interests, "", llm, "c", "w", "", 15, 10, [], muted=3)
-    assert "No new articles" in md and "Muted: 3 articles." in md and llm.calls == []
+    md = build_digest(D, [], interests, "", llm, "c", "w", "", 15, 10, [], stats="Fetched 3")
+    assert "No new articles" in md and "Fetched 3" in md and llm.calls == []
 
 
 def test_digest_has_no_images_and_lists_flags(interests):
     llm = FakeLLM(json_replies=[{"1": 9, "2": 5}], text_replies=["## K8s\n![x](http://i/x.png)\n- [a](https://ex.com/a): summary"])
-    md = build_digest(D, [item("a"), item("b")], interests, "", llm, "c", "w", "", top_n=1, also_notable=10, flagged_pages=["Kubernetes"], muted=2)
+    md = build_digest(D, [item("a"), item("b")], interests, "", llm, "c", "w", "", top_n=1, also_notable=10, flagged_pages=["Kubernetes"], stats="Fetched 2")
     assert md.startswith("# Digest 2026-11-14") and "![" not in md and "- [b](" in md
-    assert "[[Kubernetes]]" in md and "Muted: 2 articles." in md and "## Also notable" in md
+    assert "[[Kubernetes]]" in md and "Fetched 2" in md and "## Also notable" in md
 
 
 def test_images_stripped_from_llm_input(interests):
@@ -60,3 +60,11 @@ def test_auth_error_degrades_with_notice(interests):
 def test_summary_fallback_adds_notice(interests):
     md = build_digest(D, [item("a")], interests, "", FakeLLM(json_replies=[{"1": 1}]), "c", "w", "", 1, 0, [])
     assert "Summaries unavailable today (LLM error, see logs)." in md
+
+
+def test_explore_lists_titles_from_below_the_cut_off(interests):
+    llm = FakeLLM(json_replies=[{"1": 9, "2": 8, "3": 1, "4": 0}], text_replies=["## K\n- [a](https://ex.com/a): s"])
+    md = build_digest(D, [item(t) for t in "abcd"], interests, "", llm, "c", "w", "", top_n=1, also_notable=1, flagged_pages=[], explore=5)
+    explore = md.split("## Outside your usual\n")[1].split("\n\n")[0]
+    assert sorted(explore.splitlines()) == ["- [c](https://ex.com/c) — Ex Blog", "- [d](https://ex.com/d) — Ex Blog"]
+    assert len(llm.calls) == 2  # titles only: the writer model saw just the top article

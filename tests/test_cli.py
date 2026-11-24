@@ -12,6 +12,7 @@ from rss_digest import cli
 from rss_digest.cli import main, run_backlog, run_daily, seed_config
 from rss_digest.config import Config, DigestConf, FreshRSSConf, LLMConf, NextcloudConf, WallabagConf
 from rss_digest.llm import BudgetExceeded
+from rss_digest.textutil import normalize_url
 
 NOW = datetime(2026, 11, 14, 6, 0, tzinfo=UTC)
 CONF = Config(
@@ -71,6 +72,18 @@ def test_digest_only_skips_the_wiki(env):
     assert f"Digest/{NOW.date()}.md" in env.dav.files and env.state.get("last_digest_run") == NOW.isoformat()
     assert env.wb.since == "unset" and not env.state.is_processed("freshrss:s1")
     assert env.state.get("last_kept_run") is None
+
+
+def test_digest_skips_articles_already_digested_or_old(env):
+    from dataclasses import replace
+    env.fresh.reading = [item("a"), replace(item("old"), published=NOW - timedelta(days=8))]
+    daily(env)
+    assert "ex.com/a" in env.dav.files[f"Digest/{NOW.date()}.md"] and "ex.com/old" not in env.dav.files[f"Digest/{NOW.date()}.md"]
+    run_daily(CONF, env.fresh, env.wb, env.dav, env.llm, env.state, now=NOW + timedelta(days=1))
+    assert "ex.com/a" not in env.dav.files[f"Digest/{(NOW + timedelta(days=1)).date()}.md"]
+    assert "Fetched 2 · too old 1 · already seen 0 · muted 0 · ranked 1 → shown 1 + 0 + 0 explore" in env.dav.files["log.md"]
+    assert "Fetched 2 · too old 1 · already seen 1 · muted 0 · ranked 0 → shown 0 + 0 + 0 explore" in env.dav.files["log.md"]
+    assert not env.state.has_key("u:" + normalize_url("https://ex.com/a"))  # the vault may still keep it
 
 
 def test_seed_never_overwrites(env):
@@ -215,7 +228,7 @@ def test_daily_regenerates_the_index_when_pages_change(env):
 
 def test_daily_logs_the_digest(env):
     daily(env)
-    assert f"## [{NOW.date()}] digest | 0 articles" in env.dav.files["log.md"]
+    assert f"## [{NOW.date()}] digest | Fetched 0 · " in env.dav.files["log.md"]
 
 
 def test_main_lint_command_exists(tmp_path):
