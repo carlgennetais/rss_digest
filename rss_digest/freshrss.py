@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import httpx
 
+from rss_digest import newsletter
 from rss_digest.config import FreshRSSConf
 from rss_digest.models import Item
 from rss_digest.textutil import html_to_text
@@ -27,12 +28,12 @@ class FreshRSS:
             self._auth = {"Authorization": f"GoogleLogin auth={token}"}
         return self._auth
 
-    def _stream(self, name: str, since: datetime | None = None) -> list[Item]:
+    def _stream(self, name: str, since: datetime | None = None) -> list[dict]:
         headers = self._login()
         params: dict[str, str | int] = {"output": "json", "n": 1000}
         if since is not None:
             params["ot"] = int(since.timestamp())
-        items: list[Item] = []
+        items: list[dict] = []
         while True:
             r = self.client.get(
                 f"{self.base}/reader/api/0/stream/contents/user/-/state/com.google/{name}",
@@ -42,17 +43,33 @@ class FreshRSS:
             r.raise_for_status()
             data = r.json()
             # FreshRSS's ot also returns old entries it re-saw (vote counts, regenerated blogs); keep only new crawls
-            items += [_to_item(e) for e in data.get("items", [])
+            items += [e for e in data.get("items", [])
                       if since is None or int(e.get("crawlTimeMsec", 1e15)) >= since.timestamp() * 1000]
             if not data.get("continuation"):
                 return items
             params["c"] = data["continuation"]
 
     def reading_list(self, since: datetime) -> list[Item]:
-        return self._stream("reading-list", since)
+        labels = tuple(f"/label/{c}" for c in self.conf.newsletter_categories)
+        out: list[Item] = []
+        for e in self._stream("reading-list", since):
+            it = _to_item(e)
+            if any(c.endswith(labels) for c in e.get("categories", [])):
+                out += newsletter.split(it, e.get("summary", {}).get("content", ""), self._resolve)
+            else:
+                out.append(it)
+        return out
+
+    def _resolve(self, url: str) -> str:
+        """The address behind a newsletter's click-tracking redirect; the link itself if it can't be followed."""
+        try:  # GET, not HEAD: some trackers (Data Elixir) answer HEAD with 200 and no redirect; the body is never read
+            with self.client.stream("GET", url, follow_redirects=True, timeout=10) as r:
+                return str(r.url)
+        except httpx.HTTPError:
+            return url
 
     def starred(self) -> list[Item]:
-        return self._stream("starred")
+        return [_to_item(e) for e in self._stream("starred")]
 
 
 def _to_item(e: dict) -> Item:

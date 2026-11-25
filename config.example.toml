@@ -8,6 +8,7 @@ state_path = "/var/lib/rss-digest/carl_pro.db"
 url = "https://example.com/rss" # FreshRSS base URL (without /api/greader.php)
 user = "carl_pro"
 api_password = "..."            # FreshRSS > Profile > API password
+newsletter_categories = ["ds_newsletters", "llm_newsletters"] # optional: split these issues into the articles they link
 
 [wallabag]
 url = "https://example.com/wallabag"

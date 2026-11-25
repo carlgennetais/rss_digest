@@ -55,6 +55,20 @@ def test_reading_list_drops_entries_crawled_before_since():
     assert [i.title for i in FreshRSS(conf, client=rec.client).reading_list(since=since)] == ["T2", "T3"]
 
 
+def test_reading_list_splits_newsletter_categories_only():
+    from test_newsletter import ISSUE
+    labelled = entry(1, categories=["user/-/label/news"], summary={"content": ISSUE})
+    rec = Recorder(lambda r: httpx.Response(200, text="SID=x\nLSID=y\nAuth=TOKEN\n") if r.url.path.endswith("/ClientLogin")
+                   else httpx.Response(302, headers={"location": "https://real.example" + r.url.path}) if r.url.host == "t.example"
+                   else httpx.Response(200, json={"items": [labelled, entry(2, summary={"content": ISSUE})]}) if r.url.host == "rss.example"
+                   else httpx.Response(200))
+    fr = FreshRSS(FreshRSSConf(conf.url, "u", "p", newsletter_categories=["news"]), client=rec.client)
+    items = fr.reading_list(since=datetime(2026, 11, 13, tzinfo=UTC))
+    assert [i.url for i in items] == ["https://real.example/1", "https://real.example/2", "https://real.example/3", "https://ex.com/b"]
+    rec.requests.clear()
+    assert len(fr.starred()) == 2 and all(r.url.host == "rss.example" for r in rec.requests)  # the vault gets issues whole
+
+
 def test_starred_falls_back_to_alternate_and_skips_ot():
     e = entry(1)
     del e["canonical"]

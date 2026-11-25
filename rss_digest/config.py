@@ -12,6 +12,7 @@ class FreshRSSConf:
     url: str
     user: str
     api_password: str
+    newsletter_categories: list[str] = field(default_factory=list)  # split into the articles they link
 
 
 @dataclass
